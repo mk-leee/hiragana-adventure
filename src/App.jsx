@@ -140,25 +140,125 @@ function CandyBurst({ count }) {
 }
 
 // ============================================================
+// USER PROFILES
+// ============================================================
+const USERS = [
+  { id: "mankyu",  name: "만규", emoji: "🐻", color: "#FF8C00", bg: "#FFF3E0" },
+  { id: "hyeonhui", name: "현희", emoji: "🐱", color: "#E91E63", bg: "#FCE4EC" },
+  { id: "hayun",  name: "하윤", emoji: "🐰", color: "#9C27B0", bg: "#F3E5F5" },
+  { id: "harin",  name: "하린", emoji: "🐸", color: "#2196F3", bg: "#E3F2FD" },
+];
+
+function getDefaultUserData() {
+  return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡" };
+}
+
+function loadUserData(userId) {
+  try {
+    const saved = localStorage.getItem(`hiragana_user_${userId}`);
+    return saved ? { ...getDefaultUserData(), ...JSON.parse(saved) } : getDefaultUserData();
+  } catch { return getDefaultUserData(); }
+}
+
+function saveUserData(userId, data) {
+  try { localStorage.setItem(`hiragana_user_${userId}`, JSON.stringify(data)); } catch {}
+}
+
+// ============================================================
+// USER SELECT SCREEN
+// ============================================================
+function UserSelectScreen({ onSelect }) {
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #FFF5E6 0%, #FFE4B5 50%, #FFDAB9 100%)",
+      fontFamily: "'Nunito', 'Nanum Gothic', sans-serif",
+      maxWidth: 430,
+      margin: "0 auto",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", padding: 24,
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap');
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+        @keyframes bounce-in { 0%{transform:scale(0);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        button { cursor: pointer; border: none; outline: none; }
+      `}</style>
+      <div style={{ fontSize: 72, animation: "float 3s ease-in-out infinite", marginBottom: 8 }}>🦊</div>
+      <div style={{ fontSize: 26, fontWeight: 900, color: "#FF8C00", marginBottom: 4 }}>ひらがな冒険</div>
+      <div style={{ fontSize: 16, fontWeight: 800, color: "#888", marginBottom: 32 }}>누구로 시작할까요?</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, width: "100%" }}>
+        {USERS.map((user, i) => {
+          const data = loadUserData(user.id);
+          const progress = Math.round((data.completedChars.length / HIRAGANA.length) * 100);
+          return (
+            <button key={user.id} onClick={() => onSelect(user.id)} style={{
+              background: user.bg,
+              border: `3px solid ${user.color}`,
+              borderRadius: 20, padding: "20px 12px",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+              animation: `bounce-in 0.4s ${i * 0.1}s both`,
+              boxShadow: `0 4px 16px ${user.color}40`,
+              transition: "transform 0.15s, box-shadow 0.15s",
+            }}
+            onMouseDown={e => e.currentTarget.style.transform = "scale(0.95)"}
+            onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
+            onTouchStart={e => e.currentTarget.style.transform = "scale(0.95)"}
+            onTouchEnd={e => e.currentTarget.style.transform = "scale(1)"}
+            >
+              <span style={{ fontSize: 48 }}>{user.emoji}</span>
+              <span style={{ fontSize: 20, fontWeight: 900, color: user.color }}>{user.name}</span>
+              <div style={{ width: "100%", background: "#fff", borderRadius: 8, height: 8, overflow: "hidden", border: `1.5px solid ${user.color}` }}>
+                <div style={{ width: `${progress}%`, height: "100%", background: user.color, borderRadius: 8 }} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 800, color: "#888" }}>⭐{data.points} · {data.completedChars.length}/{HIRAGANA.length}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN APP
 // ============================================================
 export default function HiraganaAdventure() {
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  const handleSelectUser = (userId) => setCurrentUserId(userId);
+  const handleSwitchUser = () => setCurrentUserId(null);
+
+  if (!currentUserId) return <UserSelectScreen onSelect={handleSelectUser} />;
+  return <UserApp userId={currentUserId} onSwitchUser={handleSwitchUser} />;
+}
+
+function UserApp({ userId, onSwitchUser }) {
+  const userData = loadUserData(userId);
+  const userInfo = USERS.find(u => u.id === userId);
+
   const [screen, setScreen] = useState("home"); // home | story | quiz | fishing | balloon | shop | parent | draw
-  const [points, setPoints] = useState(120);
-  const [candies, setCandies] = useState(0);
+  const [points, setPoints] = useState(userData.points);
+  const [candies, setCandies] = useState(userData.candies);
   const [streak, setStreak] = useState(0);
-  const [owned, setOwned] = useState([1, 2]);
-  const [currentRoom, setCurrentRoom] = useState("🏡");
+  const [owned, setOwned] = useState(userData.owned.length ? userData.owned : []);
+  const [currentRoom, setCurrentRoom] = useState(userData.currentRoom || "🏡");
   const [foxDancing, setFoxDancing] = useState(false);
-  const [foxMessage, setFoxMessage] = useState("안녕! 나는 히라코야! 오늘도 같이 공부하자~");
+  const [foxMessage, setFoxMessage] = useState(`안녕 ${userInfo.name}! 나는 히라코야! 오늘도 같이 공부하자~`);
   const [foxMood, setFoxMood] = useState("happy");
   const [particles, setParticles] = useState(false);
   const [particlePos, setParticlePos] = useState({ x: 50, y: 50 });
-  const [completedChars, setCompletedChars] = useState(["あ","い","う"]);
+  const [completedChars, setCompletedChars] = useState(userData.completedChars);
   const [parentUnlocked, setParentUnlocked] = useState(false);
   const [parentPin, setParentPin] = useState("");
   const [wrongPin, setWrongPin] = useState(false);
   const [notification, setNotification] = useState(null);
+
+  // Save to localStorage whenever key data changes
+  useEffect(() => {
+    saveUserData(userId, { points, candies, completedChars, owned, currentRoom });
+  }, [userId, points, candies, completedChars, owned, currentRoom]);
 
   const triggerParticles = useCallback((x = 50, y = 50) => {
     setParticlePos({ x, y });
@@ -191,7 +291,7 @@ export default function HiraganaAdventure() {
       s === "balloon" ? "풍선을 터트려봐! 빵! 💥" :
       s === "shop" ? "뭘 살까? 골라골라~" :
       s === "draw" ? "손가락으로 써봐! ✍️" :
-      "안녕! 나는 히라코야! 오늘도 같이 공부하자~"
+      `안녕 ${userInfo.name}! 나는 히라코야! 오늘도 같이 공부하자~`
     );
     setFoxMood(s === "shop" ? "thinking" : "happy");
   };
@@ -239,7 +339,16 @@ export default function HiraganaAdventure() {
             background: "rgba(255,255,255,0.3)", border: "none", borderRadius: 10,
             color: "white", fontSize: 20, padding: "4px 10px", fontWeight: 900,
           }}>←</button>
-        ) : <span style={{ fontSize: 22 }}>{currentRoom}</span>}
+        ) : (
+          <button onClick={onSwitchUser} title="사용자 바꾸기" style={{
+            background: "rgba(255,255,255,0.3)", border: "none", borderRadius: 10,
+            color: "white", fontSize: 13, padding: "4px 8px", fontWeight: 900,
+            display: "flex", alignItems: "center", gap: 4,
+          }}>
+            <span>{userInfo.emoji}</span>
+            <span>{userInfo.name}</span>
+          </button>
+        )}
         <div style={{ color: "white", fontWeight: 900, fontSize: 16 }}>
           ひらがな冒険
         </div>
