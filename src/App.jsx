@@ -491,20 +491,51 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
 // STORY SCREEN
 // ============================================================
 function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, setFoxMessage, triggerParticles }) {
-  const [, setSelectedChapter] = useState(null);
-  const [lessonChar, setLessonChar] = useState(null);
-  const [lessonStep, setLessonStep] = useState(0); // 0:intro 1:learn 2:quiz
-  // eslint-disable-next-line no-unused-vars
-  const [quizAnswer, setQuizAnswer] = useState("");
+  const [currentChapter, setCurrentChapter] = useState(null);
+  const [charIndex, setCharIndex] = useState(0);
+  const [lessonStep, setLessonStep] = useState(0); // 0:chapter list  1:learn  2:quiz  3:complete
   const [quizResult, setQuizResult] = useState(null);
+
+  const lessonChar = currentChapter ? currentChapter.chars[charIndex] : null;
+
+  const goNextChar = useCallback(() => {
+    setQuizResult(null);
+    if (charIndex + 1 < currentChapter.chars.length) {
+      setCharIndex(i => i + 1);
+      setLessonStep(1);
+    } else {
+      setLessonStep(3); // chapter complete
+    }
+  }, [charIndex, currentChapter]);
+
+  if (lessonStep === 3) {
+    return (
+      <div style={{ textAlign: "center", padding: 20 }}>
+        <div style={{ fontSize: 72, animation: "dance 0.5s ease-in-out infinite alternate" }}>🎉</div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: "#FF8C00", margin: "12px 0 4px" }}>
+          챕터 완료!
+        </div>
+        <div style={{ fontSize: 14, color: "#888", marginBottom: 24 }}>
+          {currentChapter.chars.join(" · ")} 모두 배웠어요!
+        </div>
+        <button onClick={() => { setCurrentChapter(null); setCharIndex(0); setLessonStep(0); }} style={{
+          background: "linear-gradient(135deg, #FF8C00, #FF6347)",
+          color: "white", borderRadius: 20, padding: "14px 40px",
+          fontSize: 16, fontWeight: 900, boxShadow: "0 4px 16px rgba(255,100,0,0.4)",
+        }}>챕터 목록으로 →</button>
+      </div>
+    );
+  }
 
   if (lessonChar && lessonStep === 1) {
     const char = HIRAGANA.find(h => h.char === lessonChar);
-    // eslint-disable-next-line no-unused-vars
-    const choices = [char, ...HIRAGANA.filter(h => h.char !== lessonChar).sort(() => Math.random()-0.5).slice(0,3)]
-      .sort(() => Math.random()-0.5);
     return (
       <div>
+        <div style={{ textAlign: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 13, color: "#888", fontWeight: 700 }}>
+            {charIndex + 1} / {currentChapter.chars.length}
+          </div>
+        </div>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           <div style={{
             fontSize: 100, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
@@ -539,6 +570,11 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
       .sort(() => Math.random()-0.5);
     return (
       <div>
+        <div style={{ textAlign: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 13, color: "#888", fontWeight: 700 }}>
+            {charIndex + 1} / {currentChapter.chars.length}
+          </div>
+        </div>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <div style={{
             fontSize: 90, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, color: "#FF8C00",
@@ -548,13 +584,14 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {choices.map(c => (
             <button key={c} onClick={() => {
+              if (quizResult) return;
               if (c === char.rom) {
                 setQuizResult("correct");
                 if (!completedChars.includes(char.char)) {
                   setCompletedChars(prev => [...prev, char.char]);
                 }
                 reward(15, `${PRAISE[Math.floor(Math.random()*PRAISE.length)]} 맞았어!`, "excited");
-                setTimeout(() => { setLessonChar(null); setLessonStep(0); setQuizResult(null); }, 1500);
+                setTimeout(() => goNextChar(), 1200);
               } else {
                 setQuizResult("wrong");
                 setTimeout(() => setQuizResult(null), 1000);
@@ -586,8 +623,8 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
       {CHAPTERS.map((ch, i) => (
         <button key={i} onClick={() => {
           if (!ch.unlocked && i > 0) return;
-          setSelectedChapter(ch);
-          setLessonChar(ch.chars[0]);
+          setCurrentChapter(ch);
+          setCharIndex(0);
           setLessonStep(1);
         }} style={{
           width: "100%", marginBottom: 10,
