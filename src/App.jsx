@@ -68,7 +68,7 @@ function Particles({ active, x, y }) {
     setParticles(ps);
     const t = setTimeout(() => setParticles([]), 1200);
     return () => clearTimeout(t);
-  }, [active]);
+  }, [active, x, y]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999, overflow: "hidden" }}>
       {particles.map(p => (
@@ -382,14 +382,16 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
 // STORY SCREEN
 // ============================================================
 function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, setFoxMessage, triggerParticles }) {
-  const [selectedChapter, setSelectedChapter] = useState(null);
+  const [, setSelectedChapter] = useState(null);
   const [lessonChar, setLessonChar] = useState(null);
   const [lessonStep, setLessonStep] = useState(0); // 0:intro 1:learn 2:quiz
+  // eslint-disable-next-line no-unused-vars
   const [quizAnswer, setQuizAnswer] = useState("");
   const [quizResult, setQuizResult] = useState(null);
 
   if (lessonChar && lessonStep === 1) {
     const char = HIRAGANA.find(h => h.char === lessonChar);
+    // eslint-disable-next-line no-unused-vars
     const choices = [char, ...HIRAGANA.filter(h => h.char !== lessonChar).sort(() => Math.random()-0.5).slice(0,3)]
       .sort(() => Math.random()-0.5);
     return (
@@ -522,7 +524,7 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
 
   useEffect(() => {
     setChoices(makeChoices(current));
-  }, [current]);
+  }, [current, makeChoices]);
 
   const next = useCallback(() => {
     const next = HIRAGANA[Math.floor(Math.random() * 46)];
@@ -740,7 +742,6 @@ function BalloonGame({ reward, triggerParticles }) {
         ? { ...x, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*46)] }
         : x
       ));
-      const rect = e.currentTarget.getBoundingClientRect();
       reward(15, "빵! 맞췄어! 🎉", "excited");
       setScore(s => s + 1);
       setTarget(HIRAGANA[Math.floor(Math.random()*46)]);
