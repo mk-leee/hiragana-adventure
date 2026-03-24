@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { version } from "../package.json";
 
 // ============================================================
 // DATA
@@ -401,6 +402,9 @@ function UserApp({ userId, onSwitchUser }) {
           <Hirako mood={foxMood} message={foxMessage} size={70} dancing={foxDancing} />
         </div>
       )}
+      <div style={{ textAlign: "center", padding: "8px 0 16px", fontSize: 11, color: "#ccc", fontWeight: 700 }}>
+        v{version}
+      </div>
     </div>
   );
 }
