@@ -26,6 +26,52 @@ const HIRAGANA = [
   { char: "わ", rom: "wa" }, { char: "を", rom: "wo" }, { char: "ん", rom: "n" },
 ];
 
+// ============================================================
+// SPACED REPETITION SYSTEM
+// ============================================================
+const SRS_KEY = "hiragana_srs_v1";
+
+function loadSRSWeights() {
+  try { const s = localStorage.getItem(SRS_KEY); return s ? JSON.parse(s) : {}; }
+  catch { return {}; }
+}
+function saveSRSWeights(w) {
+  try { localStorage.setItem(SRS_KEY, JSON.stringify(w)); } catch {}
+}
+
+function useSRS() {
+  const weightsRef = useRef(loadSRSWeights());
+
+  const getWeight = (char) => weightsRef.current[char] ?? 1;
+
+  // 가중치 기반 랜덤 선택 (틀린 글자 → 높은 가중치 → 더 자주 출제)
+  const pickChar = useCallback((exclude = null) => {
+    const pool = HIRAGANA.filter(h => h.char !== exclude);
+    const ws = pool.map(h => getWeight(h.char));
+    const total = ws.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= ws[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const recordCorrect = useCallback((char) => {
+    const w = weightsRef.current;
+    w[char] = Math.max(0.25, (w[char] ?? 1) * 0.6);
+    saveSRSWeights(w);
+  }, []);
+
+  const recordWrong = useCallback((char) => {
+    const w = weightsRef.current;
+    w[char] = Math.min(8, (w[char] ?? 1) * 2.5);
+    saveSRSWeights(w);
+  }, []);
+
+  return { pickChar, recordCorrect, recordWrong };
+}
+
 const SHOP_ITEMS = [
   { id: 1, name: "별 스티커", emoji: "⭐", price: 10, type: "sticker" },
   { id: 2, name: "하트 스티커", emoji: "❤️", price: 10, type: "sticker" },
@@ -695,7 +741,8 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
 // QUIZ SCREEN
 // ============================================================
 function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
-  const [current, setCurrent] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+  const { pickChar, recordCorrect, recordWrong } = useSRS();
+  const [current, setCurrent] = useState(() => pickChar());
   const [choices, setChoices] = useState([]);
   const [selected, setSelected] = useState(null);
   const [score, setScore] = useState(0);
@@ -713,12 +760,12 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
     setChoices(makeChoices(current));
   }, [current, makeChoices]);
 
-  const next = useCallback(() => {
-    const next = HIRAGANA[Math.floor(Math.random() * HIRAGANA.length)];
-    setCurrent(next);
-    setChoices(makeChoices(next));
+  const next = useCallback((exclude = null) => {
+    const n = pickChar(exclude);
+    setCurrent(n);
+    setChoices(makeChoices(n));
     setSelected(null);
-  }, [makeChoices]);
+  }, [pickChar, makeChoices]);
 
   const pick = (c) => {
     if (processingRef.current || selected) return;
@@ -726,10 +773,12 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
     setSelected(c);
     setTotal(t => t + 1);
     if (c.char === current.char) {
+      recordCorrect(current.char);
       setScore(s => s + 1);
       reward(10, PRAISE[Math.floor(Math.random()*PRAISE.length)] + " 정답!", "excited");
-      setTimeout(() => { processingRef.current = false; next(); }, 1000);
+      setTimeout(() => { processingRef.current = false; next(current.char); }, 1000);
     } else {
+      recordWrong(current.char);
       setShake(true);
       setFoxMessage(`정답은 「${current.char}」= ${current.rom} 이야!`);
       setFoxMood("thinking");
@@ -798,12 +847,13 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
 // FISHING GAME
 // ============================================================
 function FishingGame({ reward, triggerParticles }) {
+  const { pickChar, recordCorrect, recordWrong } = useSRS();
   const [fish, setFish] = useState(() => Array.from({length:6}, (_,i) => ({
     id: i, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
     x: Math.random()*70+5, y: Math.random()*40+30, speed: Math.random()*0.5+0.3,
     dir: Math.random()>0.5?1:-1,
   })));
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+  const [target, setTarget] = useState(() => pickChar());
   const [caught, setCaught] = useState([]);
   const [miss, setMiss] = useState(0);
   const [feedback, setFeedback] = useState(null);
@@ -846,8 +896,9 @@ function FishingGame({ reward, triggerParticles }) {
     if (catchingRef.current) return;
     if (f.char.char === target.char) {
       catchingRef.current = true;
+      recordCorrect(target.char);
       setCaught(prev => [...prev, f.char.char]);
-      const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
+      const newTarget = pickChar(target.char);
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
         return [...filtered, {
@@ -861,6 +912,7 @@ function FishingGame({ reward, triggerParticles }) {
       setTarget(newTarget);
       setTimeout(() => { catchingRef.current = false; }, 400);
     } else {
+      recordWrong(target.char);
       setMiss(m => m + 1);
       triggerParticles(f.x, f.y);
       showFeedback(`「${f.char.char}」는 ${f.char.rom} 소리입니다`, false);
@@ -933,6 +985,7 @@ function FishingGame({ reward, triggerParticles }) {
 // BALLOON GAME
 // ============================================================
 function BalloonGame({ reward, triggerParticles }) {
+  const { pickChar, recordCorrect, recordWrong } = useSRS();
   const [balloons, setBalloons] = useState(() => Array.from({length:6}, (_,i) => ({
     id: i,
     char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
@@ -940,7 +993,7 @@ function BalloonGame({ reward, triggerParticles }) {
     speed: Math.random()*0.3+0.15,
     color: ["#FF69B4","#FF8C00","#4CAF50","#2196F3","#9C27B0","#FF5722"][i%6],
   })));
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+  const [target, setTarget] = useState(() => pickChar());
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const animRef = useRef();
@@ -999,7 +1052,8 @@ function BalloonGame({ reward, triggerParticles }) {
     if (poppingRef.current) return;
     if (b.char.char === target.char) {
       poppingRef.current = true;
-      const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
+      recordCorrect(target.char);
+      const newTarget = pickChar(target.char);
       setBalloons(prev => prev.map(x => x.id === b.id
         ? { ...x, y: 90, x: Math.random()*80+5, char: newTarget }
         : x
@@ -1010,6 +1064,7 @@ function BalloonGame({ reward, triggerParticles }) {
       setTarget(newTarget);
       setTimeout(() => { poppingRef.current = false; }, 400);
     } else {
+      recordWrong(target.char);
       triggerParticles(b.x, b.y);
       showFeedback(`「${b.char.char}」는 ${b.char.rom} 소리입니다`, false);
     }
@@ -1070,9 +1125,10 @@ function BalloonGame({ reward, triggerParticles }) {
 // DRAW SCREEN
 // ============================================================
 function DrawScreen({ reward, triggerParticles }) {
+  const { pickChar, recordCorrect } = useSRS();
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+  const [target, setTarget] = useState(() => pickChar());
   const [done, setDone] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const lastPos = useRef(null);
@@ -1132,9 +1188,8 @@ function DrawScreen({ reward, triggerParticles }) {
   };
 
   const nextChar = () => {
-    let next;
-    do { next = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]; } while (next.char === target.char);
-    setTarget(next);
+    recordCorrect(target.char);
+    setTarget(pickChar(target.char));
     clear();
   };
 
