@@ -730,8 +730,12 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
   const goNextChar = useCallback(() => {
     setQuizResult(null);
     if (charIndex + 1 < currentChapter.chars.length) {
-      setCharIndex(i => i + 1);
-      setLessonStep(1);
+      const nextIndex = charIndex + 1;
+      const nextChar = currentChapter.chars[nextIndex];
+      const c = HIRAGANA.find(h => h.char === nextChar);
+      setQuizChoices([c.rom, ...HIRAGANA.filter(h => h.char !== nextChar).sort(() => Math.random()-0.5).slice(0,3).map(h => h.rom)].sort(() => Math.random()-0.5));
+      setCharIndex(nextIndex);
+      setLessonStep(2); // skip intro for subsequent questions
     } else {
       // 다음 챕터 언락
       setUnlockedChapters(prev => {
