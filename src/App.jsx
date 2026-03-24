@@ -816,6 +816,17 @@ function FishingGame({ reward, triggerParticles }) {
   const [miss, setMiss] = useState(0);
   const animRef = useRef();
   const catchingRef = useRef(false);
+  const targetRef = useRef(target);
+
+  useEffect(() => { targetRef.current = target; }, [target]);
+
+  // 초기 마운트 시 물고기 중 하나를 target으로 교체
+  useEffect(() => {
+    setFish(prev => {
+      const idx = Math.floor(Math.random() * prev.length);
+      return prev.map((f, i) => i === idx ? { ...f, char: targetRef.current } : f);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const move = () => {
@@ -836,16 +847,18 @@ function FishingGame({ reward, triggerParticles }) {
     if (f.char.char === target.char) {
       catchingRef.current = true;
       setCaught(prev => [...prev, f.char.char]);
+      const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
+      // 잡힌 자리에 새 target 물고기 배치 → 항상 화면에 target 존재
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
         return [...filtered, {
-          id: Date.now(), char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
+          id: Date.now(), char: newTarget,
           x: Math.random()*70+5, y: Math.random()*40+30,
           speed: Math.random()*0.5+0.3, dir: Math.random()>0.5?1:-1,
         }];
       });
       reward(20, `「${target.char}」 낚았어! 잘했어!`, "excited");
-      setTarget(HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+      setTarget(newTarget);
       setTimeout(() => { catchingRef.current = false; }, 400);
     } else {
       setMiss(m => m + 1);
@@ -921,16 +934,43 @@ function BalloonGame({ reward, triggerParticles }) {
   const [score, setScore] = useState(0);
   const animRef = useRef();
   const poppingRef = useRef(false);
+  const targetRef = useRef(target);
+
+  // targetRef를 항상 최신 target으로 동기화
+  useEffect(() => { targetRef.current = target; }, [target]);
+
+  // 초기 마운트 시 풍선 중 하나를 target으로 교체
+  useEffect(() => {
+    setBalloons(prev => {
+      const idx = Math.floor(Math.random() * prev.length);
+      return prev.map((b, i) => i === idx ? { ...b, char: targetRef.current } : b);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const move = () => {
-      setBalloons(prev => prev.map(b => {
-        const ny = b.y - b.speed * 0.3;
-        if (ny < -15) {
-          return { ...b, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] };
-        }
-        return { ...b, y: ny };
-      }));
+      setBalloons(prev => {
+        // 아직 화면에 target 글자가 있는지 확인
+        let targetVisible = false;
+        const next = prev.map(b => {
+          const ny = b.y - b.speed * 0.3;
+          if (ny >= -15) {
+            if (b.char.char === targetRef.current.char) targetVisible = true;
+            return { ...b, y: ny };
+          }
+          return null; // 교체 필요 마킹
+        });
+        // 교체 필요한 풍선 처리 (target 보장)
+        return next.map((b, i) => {
+          if (b !== null) return b;
+          const orig = prev[i];
+          if (!targetVisible) {
+            targetVisible = true;
+            return { ...orig, y: 90, x: Math.random()*80+5, char: targetRef.current };
+          }
+          return { ...orig, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] };
+        });
+      });
       animRef.current = requestAnimationFrame(move);
     };
     animRef.current = requestAnimationFrame(move);
@@ -941,13 +981,15 @@ function BalloonGame({ reward, triggerParticles }) {
     if (poppingRef.current) return;
     if (b.char.char === target.char) {
       poppingRef.current = true;
+      const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
+      // 터진 자리에 새 target 글자 배치 → 항상 화면에 target 존재
       setBalloons(prev => prev.map(x => x.id === b.id
-        ? { ...x, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] }
+        ? { ...x, y: 90, x: Math.random()*80+5, char: newTarget }
         : x
       ));
       reward(15, "빵! 맞췄어! 🎉", "excited");
       setScore(s => s + 1);
-      setTarget(HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+      setTarget(newTarget);
       setTimeout(() => { poppingRef.current = false; }, 400);
     } else {
       triggerParticles(b.x, b.y);
