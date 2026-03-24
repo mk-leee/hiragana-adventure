@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import pkg from "../package.json";
 const version = pkg.version;
 
@@ -46,7 +46,8 @@ function useSRS() {
 
   // pool: 출제할 글자 배열(난이도별 서브셋), exclude: 직전 글자 제외
   const pickChar = useCallback((pool = HIRAGANA, exclude = null) => {
-    const filtered = pool.filter(h => h.char !== exclude);
+    const excludeSet = Array.isArray(exclude) ? new Set(exclude) : new Set(exclude ? [exclude] : []);
+    const filtered = pool.filter(h => !excludeSet.has(h.char));
     const ws = filtered.map(h => getWeight(h.char));
     const total = ws.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
@@ -450,6 +451,18 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
   const [rewardMultiplier, setRewardMultiplier] = useState(() => loadParentSettings().rewardMultiplier);
   const [charStages, setCharStages] = useState(userData.charStages || {});
   const [funnelKey, setFunnelKey] = useState(0);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+
+  // Android 뒤로가기 소프트키 가로채기
+  useEffect(() => {
+    window.history.pushState({ app: true }, "");
+    const handlePopState = () => {
+      setShowBackConfirm(true);
+      window.history.pushState({ app: true }, ""); // 히스토리 재추가 (이탈 방지)
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Save to localStorage whenever key data changes
   useEffect(() => {
@@ -599,6 +612,43 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
       <div style={{ textAlign: "center", padding: "8px 0 16px", fontSize: 11, color: "#ccc", fontWeight: 700 }}>
         v{version}
       </div>
+
+      {/* 뒤로가기 확인 다이얼로그 */}
+      {showBackConfirm && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 99999,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "white", borderRadius: 20, padding: "28px 24px",
+            width: 280, textAlign: "center",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>🦊</div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: "#333", marginBottom: 6 }}>
+              이 화면을 나가시겠어요?
+            </div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>
+              학습 진행 중이라면 저장되지 않을 수 있어요
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setShowBackConfirm(false)} style={{
+                flex: 1, padding: "12px 0", borderRadius: 14, fontSize: 15, fontWeight: 900,
+                background: "#F5F5F5", color: "#555", border: "none",
+              }}>취소</button>
+              <button onClick={() => {
+                setShowBackConfirm(false);
+                window.history.go(-2); // 앱 히스토리 2개(pushState×2) 뒤로
+              }} style={{
+                flex: 1, padding: "12px 0", borderRadius: 14, fontSize: 15, fontWeight: 900,
+                background: "linear-gradient(135deg, #FF8C00, #FF6347)",
+                color: "white", border: "none",
+              }}>나가기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -915,7 +965,7 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
 // ============================================================
 function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, difficulty = "normal", onRecord }) {
   const { pickChar, recordCorrect, recordWrong } = useSRS();
-  const charPool = getCharPool(difficulty);
+  const charPool = useMemo(() => getCharPool(difficulty), [difficulty]); // stable ref
   const [current, setCurrent] = useState(() => pickChar(charPool));
   const [choices, setChoices] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -934,18 +984,18 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
     const others = charPool.filter(h => h.char !== correct.char)
       .sort(() => Math.random()-0.5).slice(0,3);
     return [correct, ...others].sort(() => Math.random()-0.5);
-  }, [charPool]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [charPool]);
 
+  // choices는 current가 바뀔 때만 재생성 (makeChoices도 charPool이 변할 때만 재생성)
   useEffect(() => {
     setChoices(makeChoices(current));
   }, [current, makeChoices]);
 
   const next = useCallback((exclude = null) => {
     const n = pickChar(charPool, exclude);
-    setCurrent(n);
-    setChoices(makeChoices(n));
+    setCurrent(n); // useEffect가 choices를 갱신함 — 여기서 setChoices 호출 불필요
     setSelected(null);
-  }, [pickChar, charPool, makeChoices]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pickChar, charPool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (c) => {
     if (processingRef.current || selected) return;
@@ -1778,7 +1828,7 @@ function Stage4Input({ chars, onComplete }) {
       }}>
         <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && submit()}
-          placeholder={`예: ${cur.rom}`}
+          placeholder="입력하세요"
           style={{
             width: "100%", border: "none", outline: "none",
             fontSize: 26, fontWeight: 900, textAlign: "center", background: "transparent",
@@ -1811,7 +1861,7 @@ function LearningFunnelScreen({ reward, triggerParticles, difficulty, onRecord, 
 
   const [sessionChars] = useState(() => {
     const picked = [];
-    for (let i = 0; i < 5; i++) picked.push(pickChar(charPool, picked[picked.length-1]?.char));
+    for (let i = 0; i < 5; i++) picked.push(pickChar(charPool, picked.map(c => c.char)));
     return picked;
   });
   const [stage, setStage] = useState(1);
