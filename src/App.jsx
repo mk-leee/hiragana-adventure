@@ -895,10 +895,10 @@ function FishingGame({ reward, triggerParticles }) {
             <span style={{
               position: "absolute", top: -18, left: "50%",
               transform: "translateX(-50%) scaleX(-1)",
-              fontSize: 16, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
+              fontSize: 14, fontFamily: "sans-serif", fontWeight: 900,
               color: "white", textShadow: "0 1px 4px rgba(0,0,0,0.8)",
               whiteSpace: "nowrap",
-            }}>{f.char.char}</span>
+            }}>{f.char.rom}</span>
           </button>
         ))}
       </div>
