@@ -152,7 +152,7 @@ const USERS = [
 ];
 
 function getDefaultUserData() {
-  return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡" };
+  return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡", streak: 0 };
 }
 
 function loadUserData(userId) {
@@ -243,7 +243,7 @@ function UserApp({ userId, onSwitchUser }) {
   const [screen, setScreen] = useState("home"); // home | story | quiz | fishing | balloon | shop | parent | draw
   const [points, setPoints] = useState(userData.points);
   const [candies, setCandies] = useState(userData.candies);
-  const [streak, setStreak] = useState(0);
+  const [streak, setStreak] = useState(userData.streak || 0);
   const [owned, setOwned] = useState(userData.owned.length ? userData.owned : []);
   const [currentRoom, setCurrentRoom] = useState(userData.currentRoom || "🏡");
   const [foxDancing, setFoxDancing] = useState(false);
@@ -259,8 +259,8 @@ function UserApp({ userId, onSwitchUser }) {
 
   // Save to localStorage whenever key data changes
   useEffect(() => {
-    saveUserData(userId, { points, candies, completedChars, owned, currentRoom });
-  }, [userId, points, candies, completedChars, owned, currentRoom]);
+    saveUserData(userId, { points, candies, completedChars, owned, currentRoom, streak });
+  }, [userId, points, candies, completedChars, owned, currentRoom, streak]);
 
   const triggerParticles = useCallback((x = 50, y = 50) => {
     setParticlePos({ x, y });
@@ -684,7 +684,7 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
 // QUIZ SCREEN
 // ============================================================
 function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
-  const [current, setCurrent] = useState(() => HIRAGANA[Math.floor(Math.random()*10)]);
+  const [current, setCurrent] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [choices, setChoices] = useState([]);
   const [selected, setSelected] = useState(null);
   const [score, setScore] = useState(0);
@@ -702,7 +702,7 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
   }, [current, makeChoices]);
 
   const next = useCallback(() => {
-    const next = HIRAGANA[Math.floor(Math.random() * 46)];
+    const next = HIRAGANA[Math.floor(Math.random() * HIRAGANA.length)];
     setCurrent(next);
     setChoices(makeChoices(next));
     setSelected(null);
@@ -786,11 +786,11 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
 // ============================================================
 function FishingGame({ reward, triggerParticles }) {
   const [fish, setFish] = useState(() => Array.from({length:6}, (_,i) => ({
-    id: i, char: HIRAGANA[Math.floor(Math.random()*10)],
+    id: i, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
     x: Math.random()*70+5, y: Math.random()*40+30, speed: Math.random()*0.5+0.3,
     dir: Math.random()>0.5?1:-1,
   })));
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*10)]);
+  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [caught, setCaught] = useState([]);
   const [miss, setMiss] = useState(0);
   const animRef = useRef();
@@ -815,13 +815,13 @@ function FishingGame({ reward, triggerParticles }) {
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
         return [...filtered, {
-          id: Date.now(), char: HIRAGANA[Math.floor(Math.random()*20)],
+          id: Date.now(), char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
           x: Math.random()*70+5, y: Math.random()*40+30,
           speed: Math.random()*0.5+0.3, dir: Math.random()>0.5?1:-1,
         }];
       });
       reward(20, `「${target.char}」 낚았어! 잘했어!`, "excited");
-      setTarget(HIRAGANA[Math.floor(Math.random()*46)]);
+      setTarget(HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
     } else {
       setMiss(m => m + 1);
       triggerParticles(f.x, f.y);
@@ -887,12 +887,12 @@ function FishingGame({ reward, triggerParticles }) {
 function BalloonGame({ reward, triggerParticles }) {
   const [balloons, setBalloons] = useState(() => Array.from({length:6}, (_,i) => ({
     id: i,
-    char: HIRAGANA[Math.floor(Math.random()*20)],
+    char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
     x: Math.random()*80+5, y: 80 + Math.random()*10,
     speed: Math.random()*0.3+0.15,
     color: ["#FF69B4","#FF8C00","#4CAF50","#2196F3","#9C27B0","#FF5722"][i%6],
   })));
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*20)]);
+  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [score, setScore] = useState(0);
   const animRef = useRef();
 
@@ -901,7 +901,7 @@ function BalloonGame({ reward, triggerParticles }) {
       setBalloons(prev => prev.map(b => {
         const ny = b.y - b.speed * 0.3;
         if (ny < -15) {
-          return { ...b, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*46)] };
+          return { ...b, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] };
         }
         return { ...b, y: ny };
       }));
@@ -914,12 +914,12 @@ function BalloonGame({ reward, triggerParticles }) {
   const pop = (b, e) => {
     if (b.char.char === target.char) {
       setBalloons(prev => prev.map(x => x.id === b.id
-        ? { ...x, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*46)] }
+        ? { ...x, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] }
         : x
       ));
       reward(15, "빵! 맞췄어! 🎉", "excited");
       setScore(s => s + 1);
-      setTarget(HIRAGANA[Math.floor(Math.random()*46)]);
+      setTarget(HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
     } else {
       triggerParticles(b.x, b.y);
     }
