@@ -1254,8 +1254,6 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
 
   const BALLOON_COLORS = ["#F44336","#E91E63","#9C27B0","#2196F3","#009688","#FF9800"];
   const laneWidth = 80 / balloonCount;
-  const laneX = (lane) => 10 + lane * laneWidth + laneWidth * 0.5 + (Math.random() - 0.5) * laneWidth * 0.4;
-
   const [balloons, setBalloons] = useState(() => Array.from({length: balloonCount}, (_,i) => ({
     id: i,
     lane: i,
