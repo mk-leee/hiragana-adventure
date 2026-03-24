@@ -516,6 +516,7 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
   const [quizResult, setQuizResult] = useState(null); // null | "correct" | "wrong"
   const [wrongChoice, setWrongChoice] = useState(null);
   const [quizChoices, setQuizChoices] = useState([]);
+  const storyProcessingRef = useRef(false);
   const [unlockedChapters, setUnlockedChapters] = useState(() =>
     CHAPTERS.map((ch, i) => {
       if (i === 0) return true;
@@ -624,7 +625,8 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {choices.map(c => (
             <button key={c} onClick={() => {
-              if (quizResult) return;
+              if (storyProcessingRef.current || quizResult) return;
+              storyProcessingRef.current = true;
               if (c === char.rom) {
                 setQuizResult("correct");
                 setWrongChoice(null);
@@ -632,11 +634,11 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
                   setCompletedChars(prev => [...prev, char.char]);
                 }
                 reward(15, `${PRAISE[Math.floor(Math.random()*PRAISE.length)]} 맞았어!`, "excited");
-                setTimeout(() => { setQuizResult(null); setWrongChoice(null); goNextChar(); }, 1200);
+                setTimeout(() => { storyProcessingRef.current = false; setQuizResult(null); setWrongChoice(null); goNextChar(); }, 1200);
               } else {
                 setQuizResult("wrong");
                 setWrongChoice(c);
-                setTimeout(() => { setQuizResult(null); setWrongChoice(null); }, 1000);
+                setTimeout(() => { storyProcessingRef.current = false; setQuizResult(null); setWrongChoice(null); }, 1000);
               }
             }} style={{
               padding: "20px 10px",
@@ -707,6 +709,7 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
   const [score, setScore] = useState(0);
   const [total, setTotal] = useState(0);
   const [shake, setShake] = useState(false);
+  const processingRef = useRef(false);
 
   const makeChoices = useCallback((correct) => {
     const others = HIRAGANA.filter(h => h.char !== correct.char)
@@ -726,18 +729,19 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
   }, [makeChoices]);
 
   const pick = (c) => {
-    if (selected) return;
+    if (processingRef.current || selected) return;
+    processingRef.current = true;
     setSelected(c);
     setTotal(t => t + 1);
     if (c.char === current.char) {
       setScore(s => s + 1);
       reward(10, PRAISE[Math.floor(Math.random()*PRAISE.length)] + " 정답!", "excited");
-      setTimeout(next, 1000);
+      setTimeout(() => { processingRef.current = false; next(); }, 1000);
     } else {
       setShake(true);
       setFoxMessage(`정답은 「${current.char}」= ${current.rom} 이야!`);
       setFoxMood("thinking");
-      setTimeout(() => { setShake(false); next(); }, 1500);
+      setTimeout(() => { processingRef.current = false; setShake(false); next(); }, 1500);
     }
   };
 
@@ -811,6 +815,7 @@ function FishingGame({ reward, triggerParticles }) {
   const [caught, setCaught] = useState([]);
   const [miss, setMiss] = useState(0);
   const animRef = useRef();
+  const catchingRef = useRef(false);
 
   useEffect(() => {
     const move = () => {
@@ -827,7 +832,9 @@ function FishingGame({ reward, triggerParticles }) {
   }, []);
 
   const catchFish = (f) => {
+    if (catchingRef.current) return;
     if (f.char.char === target.char) {
+      catchingRef.current = true;
       setCaught(prev => [...prev, f.char.char]);
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
@@ -839,6 +846,7 @@ function FishingGame({ reward, triggerParticles }) {
       });
       reward(20, `「${target.char}」 낚았어! 잘했어!`, "excited");
       setTarget(HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+      setTimeout(() => { catchingRef.current = false; }, 400);
     } else {
       setMiss(m => m + 1);
       triggerParticles(f.x, f.y);
@@ -912,6 +920,7 @@ function BalloonGame({ reward, triggerParticles }) {
   const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [score, setScore] = useState(0);
   const animRef = useRef();
+  const poppingRef = useRef(false);
 
   useEffect(() => {
     const move = () => {
@@ -929,7 +938,9 @@ function BalloonGame({ reward, triggerParticles }) {
   }, []);
 
   const pop = (b, e) => {
+    if (poppingRef.current) return;
     if (b.char.char === target.char) {
+      poppingRef.current = true;
       setBalloons(prev => prev.map(x => x.id === b.id
         ? { ...x, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] }
         : x
@@ -937,6 +948,7 @@ function BalloonGame({ reward, triggerParticles }) {
       reward(15, "빵! 맞췄어! 🎉", "excited");
       setScore(s => s + 1);
       setTarget(HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+      setTimeout(() => { poppingRef.current = false; }, 400);
     } else {
       triggerParticles(b.x, b.y);
     }
@@ -1113,6 +1125,7 @@ function DrawScreen({ reward, triggerParticles }) {
 function ShopScreen({ points, setPoints, owned, setOwned, setCurrentRoom }) {
   const [tab, setTab] = useState("sticker");
   const [bought, setBought] = useState(null);
+  const buyingRef = useRef(false);
   const tabs = [
     { id: "sticker", label: "스티커", icon: "🌟" },
     { id: "avatar", label: "아바타", icon: "🦊" },
@@ -1121,13 +1134,18 @@ function ShopScreen({ points, setPoints, owned, setOwned, setCurrentRoom }) {
   const filtered = SHOP_ITEMS.filter(i => i.type === tab);
 
   const buy = (item) => {
-    if (owned.includes(item.id)) return;
-    if (points < item.price) { setBought("fail"); setTimeout(() => setBought(null), 1000); return; }
+    if (buyingRef.current || owned.includes(item.id)) return;
+    buyingRef.current = true;
+    if (points < item.price) {
+      setBought("fail");
+      setTimeout(() => { setBought(null); buyingRef.current = false; }, 1000);
+      return;
+    }
     setPoints(p => p - item.price);
     setOwned(prev => [...prev, item.id]);
     if (item.type === "room") setCurrentRoom(item.emoji);
     setBought(item.id);
-    setTimeout(() => setBought(null), 1200);
+    setTimeout(() => { setBought(null); buyingRef.current = false; }, 1200);
   };
 
   return (
