@@ -841,23 +841,31 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
               } else {
                 setQuizResult("wrong");
                 setWrongChoice(c);
-                setTimeout(() => { storyProcessingRef.current = false; setQuizResult(null); setWrongChoice(null); }, 1000);
+                setTimeout(() => { storyProcessingRef.current = false; setQuizResult(null); setWrongChoice(null); }, 1600);
               }
             }} style={{
               padding: "20px 10px",
               borderRadius: 16,
               fontSize: 20, fontWeight: 900,
-              background: quizResult === "correct" && c === char.rom ? "#4CAF50" :
-                          quizResult === "wrong"   && c === wrongChoice ? "#FF5252" :
+              background: c === char.rom && (quizResult === "correct" || quizResult === "wrong") ? "#4CAF50" :
+                          quizResult === "wrong" && c === wrongChoice ? "#FF5252" :
                           "white",
-              color: quizResult === "correct" && c === char.rom ? "white" :
-                     quizResult === "wrong"   && c === wrongChoice ? "white" : "#333",
+              color: c === char.rom && (quizResult === "correct" || quizResult === "wrong") ? "white" :
+                     quizResult === "wrong" && c === wrongChoice ? "white" : "#333",
               border: "3px solid #FFD700",
               boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               transition: "all 0.2s",
             }}>{c}</button>
           ))}
         </div>
+        {quizResult === "wrong" && (
+          <div style={{ marginTop: 14, padding: "10px 16px", borderRadius: 12, background: "#FFF3E0", border: "2px solid #FFA726", textAlign: "center" }}>
+            <div style={{ fontSize: 12, color: "#999", fontWeight: 700, marginBottom: 2 }}>오답 해설</div>
+            <div style={{ fontSize: 14, color: "#E65100", fontWeight: 900 }}>
+              「{char.char}」는 <span style={{ fontSize: 22 }}>{char.rom}</span> 소리입니다
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1008,7 +1016,15 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
           );
         })}
       </div>
-      {selected && (
+      {selected && selected.char !== current.char && (
+        <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 12, background: "#FFF3E0", border: "2px solid #FFA726", textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: "#999", fontWeight: 700, marginBottom: 2 }}>오답 해설</div>
+          <div style={{ fontSize: 14, color: "#E65100", fontWeight: 900 }}>
+            「{current.rom}」는 <span style={{ fontSize: 26, fontFamily: "'Noto Sans JP', sans-serif" }}>{current.char}</span> 입니다
+          </div>
+        </div>
+      )}
+      {selected && selected.char === current.char && (
         <div style={{ marginTop: 16, textAlign: "center" }}>
           <CandyBurst count={score % 5 || 1} />
         </div>
@@ -1577,12 +1593,13 @@ function Stage2Recognition({ chars, onComplete }) {
   const pick = (c) => {
     if (sel) return;
     setSel(c);
+    const ok = c.char === cur.char;
     setTimeout(() => {
-      const cur = idxRef.current;
-      if (cur + 1 >= queue.length) { onComplete(); return; }
-      setChoices(mkChoices(queue[cur + 1]));
-      setIdx(cur + 1); setSel(null);
-    }, 900);
+      const ci = idxRef.current;
+      if (ci + 1 >= queue.length) { onComplete(); return; }
+      setChoices(mkChoices(queue[ci + 1]));
+      setIdx(ci + 1); setSel(null);
+    }, ok ? 700 : 1500);
   };
 
   const cur = queue[idx];
@@ -1606,6 +1623,14 @@ function Stage2Recognition({ chars, onComplete }) {
           }}>{c.rom}</button>
         ))}
       </div>
+      {sel && sel.char !== cur.char && (
+        <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 12, background: "#FFF3E0", border: "2px solid #FFA726", textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: "#999", fontWeight: 700, marginBottom: 2 }}>오답 해설</div>
+          <div style={{ fontSize: 14, color: "#E65100", fontWeight: 900 }}>
+            「{cur.char}」는 <span style={{ fontSize: 20 }}>{cur.rom}</span> 소리입니다
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1637,12 +1662,13 @@ function Stage3Listening({ chars, onComplete }) {
   const pick = (c) => {
     if (sel) return;
     setSel(c);
+    const ok = c.char === cur.char;
     setTimeout(() => {
       const ci = idxRef.current;
       if (ci + 1 >= queue.length) { onComplete(); return; }
       setChoices(mkChoices(queue[ci + 1]));
       setIdx(ci + 1); setSel(null);
-    }, 900);
+    }, ok ? 700 : 1500);
   };
 
   const isOk = (c) => sel && c.char === cur.char;
@@ -1697,6 +1723,14 @@ function Stage3Listening({ chars, onComplete }) {
           }}>{c.char}</button>
         ))}
       </div>
+      {sel && sel.char !== cur.char && (
+        <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 12, background: "#FFF3E0", border: "2px solid #FFA726", textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: "#999", fontWeight: 700, marginBottom: 2 }}>오답 해설</div>
+          <div style={{ fontSize: 14, color: "#E65100", fontWeight: 900 }}>
+            정답은 <span style={{ fontSize: 26, fontFamily: "'Noto Sans JP', sans-serif" }}>{cur.char}</span> ({cur.rom}) 입니다
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1754,8 +1788,11 @@ function Stage4Input({ chars, onComplete }) {
         />
       </div>
       {result === "ng" && (
-        <div style={{ textAlign: "center", color: "#E65100", fontWeight: 800, fontSize: 13, marginBottom: 8 }}>
-          정답은 「{cur.rom}」 입니다
+        <div style={{ padding: "10px 14px", borderRadius: 12, background: "#FFF3E0", border: "2px solid #FFA726", textAlign: "center", marginBottom: 10 }}>
+          <div style={{ fontSize: 12, color: "#999", fontWeight: 700, marginBottom: 2 }}>오답 해설</div>
+          <div style={{ fontSize: 14, color: "#E65100", fontWeight: 900 }}>
+            「{cur.char}」의 발음은 <span style={{ fontSize: 22 }}>{cur.rom}</span> 입니다
+          </div>
         </div>
       )}
       <button onClick={submit} style={{
