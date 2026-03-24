@@ -46,7 +46,8 @@ function useSRS() {
 
   // pool: 출제할 글자 배열(난이도별 서브셋), exclude: 직전 글자 제외
   const pickChar = useCallback((pool = HIRAGANA, exclude = null) => {
-    const filtered = pool.filter(h => h.char !== exclude);
+    const excludeSet = Array.isArray(exclude) ? new Set(exclude) : new Set(exclude ? [exclude] : []);
+    const filtered = pool.filter(h => !excludeSet.has(h.char));
     const ws = filtered.map(h => getWeight(h.char));
     const total = ws.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
@@ -1811,7 +1812,7 @@ function LearningFunnelScreen({ reward, triggerParticles, difficulty, onRecord, 
 
   const [sessionChars] = useState(() => {
     const picked = [];
-    for (let i = 0; i < 5; i++) picked.push(pickChar(charPool, picked[picked.length-1]?.char));
+    for (let i = 0; i < 5; i++) picked.push(pickChar(charPool, picked.map(c => c.char)));
     return picked;
   });
   const [stage, setStage] = useState(1);
