@@ -816,6 +816,17 @@ function FishingGame({ reward, triggerParticles }) {
   const [miss, setMiss] = useState(0);
   const animRef = useRef();
   const catchingRef = useRef(false);
+  const targetRef = useRef(target);
+
+  useEffect(() => { targetRef.current = target; }, [target]);
+
+  // 초기 마운트 시 물고기 중 하나를 target으로 교체
+  useEffect(() => {
+    setFish(prev => {
+      const idx = Math.floor(Math.random() * prev.length);
+      return prev.map((f, i) => i === idx ? { ...f, char: targetRef.current } : f);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const move = () => {
@@ -836,16 +847,18 @@ function FishingGame({ reward, triggerParticles }) {
     if (f.char.char === target.char) {
       catchingRef.current = true;
       setCaught(prev => [...prev, f.char.char]);
+      const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
+      // 잡힌 자리에 새 target 물고기 배치 → 항상 화면에 target 존재
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
         return [...filtered, {
-          id: Date.now(), char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
+          id: Date.now(), char: newTarget,
           x: Math.random()*70+5, y: Math.random()*40+30,
           speed: Math.random()*0.5+0.3, dir: Math.random()>0.5?1:-1,
         }];
       });
       reward(20, `「${target.char}」 낚았어! 잘했어!`, "excited");
-      setTarget(HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+      setTarget(newTarget);
       setTimeout(() => { catchingRef.current = false; }, 400);
     } else {
       setMiss(m => m + 1);
