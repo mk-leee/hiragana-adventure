@@ -451,6 +451,18 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
   const [rewardMultiplier, setRewardMultiplier] = useState(() => loadParentSettings().rewardMultiplier);
   const [charStages, setCharStages] = useState(userData.charStages || {});
   const [funnelKey, setFunnelKey] = useState(0);
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
+
+  // Android 뒤로가기 소프트키 가로채기
+  useEffect(() => {
+    window.history.pushState({ app: true }, "");
+    const handlePopState = () => {
+      setShowBackConfirm(true);
+      window.history.pushState({ app: true }, ""); // 히스토리 재추가 (이탈 방지)
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   // Save to localStorage whenever key data changes
   useEffect(() => {
@@ -600,6 +612,43 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
       <div style={{ textAlign: "center", padding: "8px 0 16px", fontSize: 11, color: "#ccc", fontWeight: 700 }}>
         v{version}
       </div>
+
+      {/* 뒤로가기 확인 다이얼로그 */}
+      {showBackConfirm && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 99999,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            background: "white", borderRadius: 20, padding: "28px 24px",
+            width: 280, textAlign: "center",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.25)",
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 10 }}>🦊</div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: "#333", marginBottom: 6 }}>
+              이 화면을 나가시겠어요?
+            </div>
+            <div style={{ fontSize: 13, color: "#888", marginBottom: 24 }}>
+              학습 진행 중이라면 저장되지 않을 수 있어요
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setShowBackConfirm(false)} style={{
+                flex: 1, padding: "12px 0", borderRadius: 14, fontSize: 15, fontWeight: 900,
+                background: "#F5F5F5", color: "#555", border: "none",
+              }}>취소</button>
+              <button onClick={() => {
+                setShowBackConfirm(false);
+                window.history.go(-2); // 앱 히스토리 2개(pushState×2) 뒤로
+              }} style={{
+                flex: 1, padding: "12px 0", borderRadius: 14, fontSize: 15, fontWeight: 900,
+                background: "linear-gradient(135deg, #FF8C00, #FF6347)",
+                color: "white", border: "none",
+              }}>나가기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
