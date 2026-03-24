@@ -390,14 +390,6 @@ function UserApp({ userId, onSwitchUser }) {
         }}>{notification.text}</div>
       )}
 
-      {/* STREAK BADGE */}
-      {streak > 0 && (
-        <div style={{
-          background: "linear-gradient(135deg, #FF69B4, #FF1493)",
-          color: "white", textAlign: "center", padding: "4px",
-          fontSize: 12, fontWeight: 800, letterSpacing: 1,
-        }}>🔥 {streak}연속 정답! 대단해요!</div>
-      )}
 
       <div style={{ padding: 16 }}>
         {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} />}
@@ -903,10 +895,10 @@ function FishingGame({ reward, triggerParticles }) {
             <span style={{
               position: "absolute", top: -18, left: "50%",
               transform: "translateX(-50%) scaleX(-1)",
-              fontSize: 16, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
+              fontSize: 14, fontFamily: "sans-serif", fontWeight: 900,
               color: "white", textShadow: "0 1px 4px rgba(0,0,0,0.8)",
               whiteSpace: "nowrap",
-            }}>{f.char.char}</span>
+            }}>{f.char.rom}</span>
           </button>
         ))}
       </div>
