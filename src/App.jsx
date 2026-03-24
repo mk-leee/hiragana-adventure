@@ -449,6 +449,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
   const [notification, setNotification] = useState(null);
   const [rewardMultiplier, setRewardMultiplier] = useState(() => loadParentSettings().rewardMultiplier);
   const [charStages, setCharStages] = useState(userData.charStages || {});
+  const [funnelKey, setFunnelKey] = useState(0);
 
   // Save to localStorage whenever key data changes
   useEffect(() => {
@@ -579,7 +580,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
 
       <div style={{ padding: 16 }}>
         {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} charStages={charStages} />}
-        {screen === "funnel" && <LearningFunnelScreen reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} charStages={charStages} setCharStages={setCharStages} onHome={() => showScreen("home")} />}
+        {screen === "funnel" && <LearningFunnelScreen key={funnelKey} reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} charStages={charStages} setCharStages={setCharStages} onHome={() => showScreen("home")} onNewSession={() => setFunnelKey(k => k + 1)} />}
         {screen === "story" && <StoryScreen reward={reward} completedChars={completedChars} setCompletedChars={setCompletedChars} foxMood={foxMood} setFoxMood={setFoxMood} setFoxMessage={setFoxMessage} triggerParticles={triggerParticles} />}
         {screen === "quiz" && <QuizScreen reward={reward} triggerParticles={triggerParticles} setFoxMessage={setFoxMessage} setFoxMood={setFoxMood} difficulty={difficulty} onRecord={onRecord} />}
         {screen === "fishing" && <FishingGame reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
@@ -1467,9 +1468,9 @@ function FunnelStageBar({ stage }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 18 }}>
       {stages.map((s, i) => (
-        <div key={s.n} style={{ display: "flex", alignItems: "center", flex: 1, flexDirection: "column" }}>
+        <div key={s.n} style={{ display: "contents" }}>
           <div style={{
-            width: "100%", padding: "8px 4px", borderRadius: 12, textAlign: "center",
+            flex: 1, padding: "8px 4px", borderRadius: 12, textAlign: "center",
             background: stage > s.n ? "#4CAF50" : stage === s.n ? "linear-gradient(135deg,#FF8C00,#FF6347)" : "#E8E8E8",
             color: stage >= s.n ? "white" : "#AAA", fontWeight: 900, fontSize: 11,
             boxShadow: stage === s.n ? "0 3px 10px rgba(255,140,0,0.45)" : "none",
@@ -1477,7 +1478,7 @@ function FunnelStageBar({ stage }) {
             <div style={{ fontSize: 15, marginBottom: 2 }}>{stage > s.n ? "✓" : s.icon}</div>
             <div>{s.label}</div>
           </div>
-          {i < 3 && <div style={{ fontSize: 9, color: "#CCC", marginTop: 2 }}>▼</div>}
+          {i < 3 && <div style={{ color: "#CCC", fontSize: 10, flexShrink: 0 }}>▶</div>}
         </div>
       ))}
     </div>
@@ -1492,25 +1493,30 @@ function Stage1Matching({ chars, onComplete }) {
   const [matched, setMatched] = useState(new Set());
   const [flash, setFlash] = useState(null);
 
-  const handleLeft = (i) => {
-    if (matched.has(chars[i].char) || flash) return;
-    setLeftSel(i); setRightSel(null);
-  };
-
-  const handleRight = (i) => {
-    if (matched.has(romOrder[i].char) || flash) return;
-    if (leftSel === null) { setRightSel(i); return; }
-    if (chars[leftSel].char === romOrder[i].char) {
-      const next = new Set(matched); next.add(chars[leftSel].char);
+  const doMatch = (leftIdx, rightIdx) => {
+    if (chars[leftIdx].char === romOrder[rightIdx].char) {
+      const next = new Set(matched); next.add(chars[leftIdx].char);
       setMatched(next); setFlash("ok");
       setTimeout(() => {
         setFlash(null); setLeftSel(null); setRightSel(null);
         if (next.size === chars.length) setTimeout(onComplete, 500);
       }, 500);
     } else {
-      setRightSel(i); setFlash("no");
+      setLeftSel(leftIdx); setRightSel(rightIdx); setFlash("no");
       setTimeout(() => { setFlash(null); setLeftSel(null); setRightSel(null); }, 700);
     }
+  };
+
+  const handleLeft = (i) => {
+    if (matched.has(chars[i].char) || flash) return;
+    if (rightSel !== null) { doMatch(i, rightSel); return; }
+    setLeftSel(i); setRightSel(null);
+  };
+
+  const handleRight = (i) => {
+    if (matched.has(romOrder[i].char) || flash) return;
+    if (leftSel !== null) { doMatch(leftSel, i); return; }
+    setRightSel(i); setLeftSel(null);
   };
 
   const cardBase = (isMatched, isSel, side) => ({
@@ -1557,14 +1563,17 @@ function Stage2Recognition({ chars, onComplete }) {
   const [idx, setIdx] = useState(0);
   const [choices, setChoices] = useState(() => mkChoices(chars[0]));
   const [sel, setSel] = useState(null);
+  const idxRef = useRef(0);
+  useEffect(() => { idxRef.current = idx; }, [idx]);
 
   const pick = (c) => {
     if (sel) return;
     setSel(c);
     setTimeout(() => {
-      if (idx + 1 >= queue.length) { onComplete(); return; }
-      setChoices(mkChoices(queue[idx + 1]));
-      setIdx(i => i + 1); setSel(null);
+      const cur = idxRef.current;
+      if (cur + 1 >= queue.length) { onComplete(); return; }
+      setChoices(mkChoices(queue[cur + 1]));
+      setIdx(cur + 1); setSel(null);
     }, 900);
   };
 
@@ -1601,12 +1610,19 @@ function Stage3Listening({ chars, onComplete }) {
   const [choices, setChoices] = useState(() => mkChoices(chars[0]));
   const [sel, setSel] = useState(null);
   const [playing, setPlaying] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const idxRef = useRef(0);
+  useEffect(() => { idxRef.current = idx; }, [idx]);
+  useEffect(() => { setShowHint(false); }, [idx]);
 
+  const hasTTS = typeof window !== "undefined" && !!window.speechSynthesis;
   const cur = queue[idx];
+
   const playSound = useCallback(() => {
+    if (!hasTTS) return;
     setPlaying(true); speak(cur.char);
     setTimeout(() => setPlaying(false), 1000);
-  }, [cur]);
+  }, [cur, hasTTS]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setTimeout(playSound, 350); }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1614,9 +1630,10 @@ function Stage3Listening({ chars, onComplete }) {
     if (sel) return;
     setSel(c);
     setTimeout(() => {
-      if (idx + 1 >= queue.length) { onComplete(); return; }
-      setChoices(mkChoices(queue[idx + 1]));
-      setIdx(i => i + 1); setSel(null);
+      const ci = idxRef.current;
+      if (ci + 1 >= queue.length) { onComplete(); return; }
+      setChoices(mkChoices(queue[ci + 1]));
+      setIdx(ci + 1); setSel(null);
     }, 900);
   };
 
@@ -1626,19 +1643,41 @@ function Stage3Listening({ chars, onComplete }) {
   return (
     <div>
       <div style={{ textAlign: "center", fontSize: 12, color: "#AAA", fontWeight: 700, marginBottom: 8 }}>{idx+1} / {queue.length}</div>
-      <div style={{ textAlign: "center", marginBottom: 16 }}>
-        <button onClick={playSound} style={{
-          fontSize: 52, padding: "16px 28px", borderRadius: 24,
-          background: playing ? "#FFF3E0" : "white",
-          border: `3px solid ${playing ? "#FF8C00" : "#DDD"}`,
-          boxShadow: playing ? "0 0 20px rgba(255,140,0,0.3)" : "0 2px 8px rgba(0,0,0,0.07)",
-          animation: playing ? "pulse 0.5s infinite" : "none",
-        }}>🔊</button>
-        <div style={{ fontSize: 12, color: "#AAA", fontWeight: 700, marginTop: 6 }}>탭하여 다시 듣기</div>
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
+        {hasTTS ? (
+          <>
+            <button onClick={playSound} style={{
+              fontSize: 52, padding: "16px 28px", borderRadius: 24,
+              background: playing ? "#FFF3E0" : "white",
+              border: `3px solid ${playing ? "#FF8C00" : "#DDD"}`,
+              boxShadow: playing ? "0 0 20px rgba(255,140,0,0.3)" : "0 2px 8px rgba(0,0,0,0.07)",
+              animation: playing ? "pulse 0.5s infinite" : "none",
+            }}>🔊</button>
+            <div style={{ fontSize: 12, color: "#AAA", fontWeight: 700, marginTop: 6 }}>탭하여 다시 듣기</div>
+          </>
+        ) : (
+          <div style={{ padding: "10px 16px", background: "#FFF8E1", border: "2px solid #FFD54F", borderRadius: 12, fontSize: 13, color: "#F57F17", fontWeight: 700 }}>
+            ⚠️ 이 기기는 음성을 지원하지 않습니다. 힌트를 사용하세요.
+          </div>
+        )}
       </div>
-      <div style={{ fontSize: 13, color: "#888", fontWeight: 700, textAlign: "center", marginBottom: 12 }}>
-        들은 소리에 해당하는 히라가나를 선택하세요
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ fontSize: 13, color: "#888", fontWeight: 700 }}>
+          {hasTTS ? "소리에 맞는 히라가나를 선택하세요" : "발음에 맞는 히라가나를 선택하세요"}
+        </div>
+        <button onClick={() => setShowHint(h => !h)} style={{
+          fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 10,
+          background: showHint ? "#FFF3E0" : "#F5F5F5",
+          border: `2px solid ${showHint ? "#FF8C00" : "#DDD"}`,
+          color: showHint ? "#FF8C00" : "#999",
+        }}>💡 힌트</button>
       </div>
+      {showHint && (
+        <div style={{ textAlign: "center", marginBottom: 10, fontSize: 18, fontWeight: 900, color: "#FF8C00",
+          background: "#FFF8E1", borderRadius: 12, padding: "8px", border: "2px solid #FFD54F" }}>
+          발음: <span style={{ fontSize: 22 }}>{cur.rom}</span>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {choices.map(c => (
           <button key={c.char} onClick={() => pick(c)} style={{
@@ -1721,7 +1760,7 @@ function Stage4Input({ chars, onComplete }) {
 }
 
 // 메인 학습 퍼널 화면
-function LearningFunnelScreen({ reward, triggerParticles, difficulty, onRecord, charStages, setCharStages, onHome }) {
+function LearningFunnelScreen({ reward, triggerParticles, difficulty, onRecord, charStages, setCharStages, onHome, onNewSession }) {
   const { pickChar, recordCorrect } = useSRS();
   const charPool = getCharPool(difficulty);
 
@@ -1766,11 +1805,11 @@ function LearningFunnelScreen({ reward, triggerParticles, difficulty, onRecord, 
           </div>
         ))}
       </div>
-      <button onClick={() => { setDone(false); setStage(1); }} style={{
+      <button onClick={onNewSession} style={{
         width: "100%", padding: "14px", borderRadius: 16, fontSize: 16, fontWeight: 900,
         background: "linear-gradient(90deg, #FF8C00, #FF6347)", color: "white", border: "none",
         boxShadow: "0 4px 14px rgba(255,140,0,0.35)", marginBottom: 10,
-      }}>새 세션 🔄</button>
+      }}>새 세션 (다른 글자) 🔄</button>
       <button onClick={onHome} style={{
         width: "100%", padding: "14px", borderRadius: 16, fontSize: 15, fontWeight: 800,
         background: "#EEE", color: "#666", border: "2px solid #CCC",
