@@ -914,7 +914,8 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
   const statsRef = useRef({ correct: 0, wrong: 0 });
 
   useEffect(() => {
-    return () => { if (onRecord) onRecord("quiz", statsRef.current.correct, statsRef.current.wrong); };
+    const stats = statsRef.current;
+    return () => { if (onRecord) onRecord("quiz", stats.correct, stats.wrong); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const makeChoices = useCallback((correct) => {
@@ -1023,7 +1024,8 @@ function FishingGame({ reward, triggerParticles, difficulty = "normal", onRecord
   const statsRef = useRef({ correct: 0, wrong: 0 });
 
   useEffect(() => {
-    return () => { if (onRecord) onRecord("fishing", statsRef.current.correct, statsRef.current.wrong); };
+    const stats = statsRef.current;
+    return () => { if (onRecord) onRecord("fishing", stats.correct, stats.wrong); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const makeFish = (excludeId, targetChar) => ({
@@ -1176,7 +1178,8 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
   const statsRef = useRef({ correct: 0, wrong: 0 });
 
   useEffect(() => {
-    return () => { if (onRecord) onRecord("balloon", statsRef.current.correct, statsRef.current.wrong); };
+    const stats = statsRef.current;
+    return () => { if (onRecord) onRecord("balloon", stats.correct, stats.wrong); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [balloons, setBalloons] = useState(() => Array.from({length: balloonCount}, (_,i) => ({
@@ -1233,7 +1236,7 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
     };
     animRef.current = requestAnimationFrame(move);
     return () => cancelAnimationFrame(animRef.current);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showFeedback = (msg, correct) => {
     clearTimeout(feedbackTimerRef.current);
@@ -1322,9 +1325,10 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
 function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord }) {
   const { pickChar, recordCorrect } = useSRS();
   const charPool = getCharPool(difficulty);
-  const practiceRef = useRef(0);
+  const practiceRef = useRef({ count: 0 });
   useEffect(() => {
-    return () => { if (onRecord) onRecord("draw", practiceRef.current, 0); };
+    const pr = practiceRef.current;
+    return () => { if (onRecord) onRecord("draw", pr.count, 0); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
@@ -1389,7 +1393,7 @@ function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord 
 
   const nextChar = () => {
     recordCorrect(target.char);
-    practiceRef.current++;
+    practiceRef.current.count++;
     setTarget(pickChar(charPool, target.char));
     clear();
   };
