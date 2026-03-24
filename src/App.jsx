@@ -44,17 +44,17 @@ function useSRS() {
 
   const getWeight = (char) => weightsRef.current[char] ?? 1;
 
-  // 가중치 기반 랜덤 선택 (틀린 글자 → 높은 가중치 → 더 자주 출제)
-  const pickChar = useCallback((exclude = null) => {
-    const pool = HIRAGANA.filter(h => h.char !== exclude);
-    const ws = pool.map(h => getWeight(h.char));
+  // pool: 출제할 글자 배열(난이도별 서브셋), exclude: 직전 글자 제외
+  const pickChar = useCallback((pool = HIRAGANA, exclude = null) => {
+    const filtered = pool.filter(h => h.char !== exclude);
+    const ws = filtered.map(h => getWeight(h.char));
     const total = ws.reduce((a, b) => a + b, 0);
     let r = Math.random() * total;
-    for (let i = 0; i < pool.length; i++) {
+    for (let i = 0; i < filtered.length; i++) {
       r -= ws[i];
-      if (r <= 0) return pool[i];
+      if (r <= 0) return filtered[i];
     }
-    return pool[pool.length - 1];
+    return filtered[filtered.length - 1];
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recordCorrect = useCallback((char) => {
@@ -70,6 +70,41 @@ function useSRS() {
   }, []);
 
   return { pickChar, recordCorrect, recordWrong };
+}
+
+// ============================================================
+// DIFFICULTY SYSTEM
+// ============================================================
+const DIFFICULTY_CONFIG = {
+  beginner: { label: "초급",   emoji: "🌱", color: "#4CAF50", charLimit: 15, speedMult: 0.65, entityCount: 4,
+              desc: "처음 15자 · 느린 속도" },
+  normal:   { label: "보통",   emoji: "🌟", color: "#2196F3", charLimit: 46, speedMult: 1.0,  entityCount: 6,
+              desc: "전체 글자 · 보통 속도" },
+  hard:     { label: "고급",   emoji: "🔥", color: "#F44336", charLimit: 46, speedMult: 1.6,  entityCount: 8,
+              desc: "전체 글자 · 빠른 속도" },
+  auto:     { label: "자동 AI", emoji: "🤖", color: "#9C27B0", charLimit: null, speedMult: null, entityCount: null,
+              desc: "실력에 맞게 자동 조절" },
+};
+
+// SRS 가중치로 실력 수준을 판단 → 자동 난이도 산출
+function computeAutoDifficulty() {
+  const weights = loadSRSWeights();
+  const total = HIRAGANA.reduce((s, h) => s + (weights[h.char] ?? 1), 0);
+  const avg = total / HIRAGANA.length;
+  if (avg > 2.0) return "beginner";
+  if (avg < 0.55) return "hard";
+  return "normal";
+}
+
+// "auto"면 실제 설정값을 계산해 반환
+function resolveConfig(difficulty) {
+  if (difficulty === "auto") return DIFFICULTY_CONFIG[computeAutoDifficulty()];
+  return DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.normal;
+}
+
+function getCharPool(difficulty) {
+  const limit = resolveConfig(difficulty).charLimit;
+  return limit ? HIRAGANA.slice(0, limit) : HIRAGANA;
 }
 
 const SHOP_ITEMS = [
@@ -198,7 +233,21 @@ const USERS = [
 ];
 
 function getDefaultUserData() {
-  return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡", streak: 0 };
+  return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡", streak: 0,
+           difficulty: "auto", playHistory: [] };
+}
+
+function savePlayRecord(userId, game, correct, wrong) {
+  try {
+    const key = `hiragana_user_${userId}`;
+    const raw = localStorage.getItem(key);
+    const data = raw ? JSON.parse(raw) : getDefaultUserData();
+    const history = data.playHistory || [];
+    history.push({ date: new Date().toISOString().slice(0, 10), game, correct, wrong, ts: Date.now() });
+    if (history.length > 200) history.splice(0, history.length - 200);
+    data.playHistory = history;
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {}
 }
 
 function loadUserData(userId) {
@@ -281,21 +330,106 @@ function UserSelectScreen({ onSelect }) {
 }
 
 // ============================================================
+// DIFFICULTY SELECT SCREEN
+// ============================================================
+function DifficultySelectScreen({ userInfo, savedDifficulty, onSelect }) {
+  const [selected, setSelected] = useState(savedDifficulty || "auto");
+  const effectiveLabel = selected === "auto"
+    ? `현재 실력: ${DIFFICULTY_CONFIG[computeAutoDifficulty()].label}`
+    : null;
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #FFF5E6 0%, #FFE4B5 50%, #FFDAB9 100%)",
+      fontFamily: "'Nunito', 'Nanum Gothic', sans-serif",
+      maxWidth: 430, margin: "0 auto",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", padding: 24,
+    }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap');
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes bounce-in{0%{transform:scale(0);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}button{cursor:pointer;border:none;outline:none;}`}</style>
+
+      <div style={{ fontSize: 56, animation: "float 3s ease-in-out infinite" }}>{userInfo.emoji}</div>
+      <div style={{ fontSize: 22, fontWeight: 900, color: userInfo.color, margin: "8px 0 4px" }}>{userInfo.name}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: "#888", marginBottom: 28 }}>난이도를 선택해주세요</div>
+
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+        {Object.entries(DIFFICULTY_CONFIG).map(([key, cfg]) => (
+          <button key={key} onClick={() => setSelected(key)} style={{
+            background: selected === key ? cfg.color : "white",
+            border: `3px solid ${cfg.color}`,
+            borderRadius: 18, padding: "14px 20px",
+            display: "flex", alignItems: "center", gap: 16,
+            boxShadow: selected === key ? `0 4px 18px ${cfg.color}60` : "0 2px 8px rgba(0,0,0,0.08)",
+            transition: "all 0.2s",
+          }}>
+            <span style={{ fontSize: 32 }}>{cfg.emoji}</span>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontWeight: 900, fontSize: 17, color: selected === key ? "white" : cfg.color }}>{cfg.label}</div>
+              <div style={{ fontWeight: 700, fontSize: 12, color: selected === key ? "rgba(255,255,255,0.85)" : "#999" }}>{cfg.desc}</div>
+            </div>
+            {selected === key && <div style={{ marginLeft: "auto", color: "white", fontSize: 22 }}>✓</div>}
+          </button>
+        ))}
+      </div>
+
+      {effectiveLabel && (
+        <div style={{ marginTop: 14, fontSize: 13, fontWeight: 800, color: "#9C27B0",
+          background: "#F3E5F5", borderRadius: 12, padding: "6px 16px" }}>
+          🤖 {effectiveLabel}
+        </div>
+      )}
+
+      <button onClick={() => onSelect(selected)} style={{
+        marginTop: 28, width: "100%", padding: "16px 0",
+        background: "linear-gradient(90deg, #FF8C00, #FF6347)",
+        color: "white", borderRadius: 20, fontSize: 18, fontWeight: 900,
+        boxShadow: "0 6px 20px rgba(255,100,0,0.35)",
+      }}>시작하기 🚀</button>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN APP
 // ============================================================
 export default function HiraganaAdventure() {
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [difficulty, setDifficulty] = useState(null);
 
   const handleSelectUser = (userId) => setCurrentUserId(userId);
-  const handleSwitchUser = () => setCurrentUserId(null);
+  const handleSelectDifficulty = (diff) => {
+    // 선택한 난이도를 user data에 저장
+    const key = `hiragana_user_${currentUserId}`;
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : getDefaultUserData();
+      data.difficulty = diff;
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch {}
+    setDifficulty(diff);
+  };
+  const handleSwitchUser = () => { setCurrentUserId(null); setDifficulty(null); };
 
   if (!currentUserId) return <UserSelectScreen onSelect={handleSelectUser} />;
-  return <UserApp userId={currentUserId} onSwitchUser={handleSwitchUser} />;
+  if (!difficulty) {
+    const userInfo = USERS.find(u => u.id === currentUserId);
+    const saved = loadUserData(currentUserId).difficulty || "auto";
+    return <DifficultySelectScreen userInfo={userInfo} savedDifficulty={saved} onSelect={handleSelectDifficulty} />;
+  }
+  return <UserApp userId={currentUserId} difficulty={difficulty} onSwitchUser={handleSwitchUser} />;
 }
 
-function UserApp({ userId, onSwitchUser }) {
+function UserApp({ userId, difficulty, onSwitchUser }) {
   const userData = loadUserData(userId);
   const userInfo = USERS.find(u => u.id === userId);
+  const diffCfg = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.normal;
+  const onRecord = useCallback((game, correct, wrong) => {
+    savePlayRecord(userId, game, correct, wrong);
+  }, [userId]);
 
   const [screen, setScreen] = useState("home"); // home | story | quiz | fishing | balloon | shop | parent | draw
   const [points, setPoints] = useState(userData.points);
@@ -410,8 +544,12 @@ function UserApp({ userId, onSwitchUser }) {
             <span>{userInfo.name}</span>
           </button>
         )}
-        <div style={{ color: "white", fontWeight: 900, fontSize: 16 }}>
+        <div style={{ color: "white", fontWeight: 900, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
           ひらがな冒険
+          <span style={{
+            background: "rgba(255,255,255,0.22)", borderRadius: 10,
+            padding: "2px 7px", fontSize: 11, fontWeight: 800,
+          }}>{diffCfg.emoji} {diffCfg.label}</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{
@@ -440,11 +578,11 @@ function UserApp({ userId, onSwitchUser }) {
       <div style={{ padding: 16 }}>
         {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} />}
         {screen === "story" && <StoryScreen reward={reward} completedChars={completedChars} setCompletedChars={setCompletedChars} foxMood={foxMood} setFoxMood={setFoxMood} setFoxMessage={setFoxMessage} triggerParticles={triggerParticles} />}
-        {screen === "quiz" && <QuizScreen reward={reward} triggerParticles={triggerParticles} setFoxMessage={setFoxMessage} setFoxMood={setFoxMood} />}
-        {screen === "fishing" && <FishingGame reward={reward} triggerParticles={triggerParticles} />}
-        {screen === "balloon" && <BalloonGame reward={reward} triggerParticles={triggerParticles} />}
+        {screen === "quiz" && <QuizScreen reward={reward} triggerParticles={triggerParticles} setFoxMessage={setFoxMessage} setFoxMood={setFoxMood} difficulty={difficulty} onRecord={onRecord} />}
+        {screen === "fishing" && <FishingGame reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
+        {screen === "balloon" && <BalloonGame reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
         {screen === "shop" && <ShopScreen points={points} setPoints={setPoints} owned={owned} setOwned={setOwned} setCurrentRoom={setCurrentRoom} />}
-        {screen === "draw" && <DrawScreen reward={reward} triggerParticles={triggerParticles} />}
+        {screen === "draw" && <DrawScreen reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
         {screen === "parent" && <ParentScreen parentUnlocked={parentUnlocked} setParentUnlocked={setParentUnlocked} parentPin={parentPin} setParentPin={setParentPin} wrongPin={wrongPin} setWrongPin={setWrongPin} completedChars={completedChars} points={points} candies={candies} setRewardMultiplier={setRewardMultiplier} />}
       </div>
 
@@ -740,32 +878,38 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
 // ============================================================
 // QUIZ SCREEN
 // ============================================================
-function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
+function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, difficulty = "normal", onRecord }) {
   const { pickChar, recordCorrect, recordWrong } = useSRS();
-  const [current, setCurrent] = useState(() => pickChar());
+  const charPool = getCharPool(difficulty);
+  const [current, setCurrent] = useState(() => pickChar(charPool));
   const [choices, setChoices] = useState([]);
   const [selected, setSelected] = useState(null);
   const [score, setScore] = useState(0);
   const [total, setTotal] = useState(0);
   const [shake, setShake] = useState(false);
   const processingRef = useRef(false);
+  const statsRef = useRef({ correct: 0, wrong: 0 });
+
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("quiz", statsRef.current.correct, statsRef.current.wrong); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const makeChoices = useCallback((correct) => {
-    const others = HIRAGANA.filter(h => h.char !== correct.char)
+    const others = charPool.filter(h => h.char !== correct.char)
       .sort(() => Math.random()-0.5).slice(0,3);
     return [correct, ...others].sort(() => Math.random()-0.5);
-  }, []);
+  }, [charPool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setChoices(makeChoices(current));
   }, [current, makeChoices]);
 
   const next = useCallback((exclude = null) => {
-    const n = pickChar(exclude);
+    const n = pickChar(charPool, exclude);
     setCurrent(n);
     setChoices(makeChoices(n));
     setSelected(null);
-  }, [pickChar, makeChoices]);
+  }, [pickChar, charPool, makeChoices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (c) => {
     if (processingRef.current || selected) return;
@@ -774,11 +918,13 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
     setTotal(t => t + 1);
     if (c.char === current.char) {
       recordCorrect(current.char);
+      statsRef.current.correct++;
       setScore(s => s + 1);
       reward(10, PRAISE[Math.floor(Math.random()*PRAISE.length)] + " 정답!", "excited");
       setTimeout(() => { processingRef.current = false; next(current.char); }, 1000);
     } else {
       recordWrong(current.char);
+      statsRef.current.wrong++;
       setShake(true);
       setFoxMessage(`정답은 「${current.char}」= ${current.rom} 이야!`);
       setFoxMood("thinking");
@@ -846,14 +992,27 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
 // ============================================================
 // FISHING GAME
 // ============================================================
-function FishingGame({ reward, triggerParticles }) {
+function FishingGame({ reward, triggerParticles, difficulty = "normal", onRecord }) {
   const { pickChar, recordCorrect, recordWrong } = useSRS();
-  const [fish, setFish] = useState(() => Array.from({length:6}, (_,i) => ({
-    id: i, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
-    x: Math.random()*70+5, y: Math.random()*40+30, speed: Math.random()*0.5+0.3,
+  const charPool = getCharPool(difficulty);
+  const cfg = resolveConfig(difficulty);
+  const fishCount = cfg.entityCount;
+  const statsRef = useRef({ correct: 0, wrong: 0 });
+
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("fishing", statsRef.current.correct, statsRef.current.wrong); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const makeFish = (excludeId, targetChar) => ({
+    id: excludeId ?? Date.now(),
+    char: charPool[Math.floor(Math.random()*charPool.length)],
+    x: Math.random()*70+5, y: Math.random()*40+30,
+    speed: (Math.random()*0.5+0.3) * cfg.speedMult,
     dir: Math.random()>0.5?1:-1,
-  })));
-  const [target, setTarget] = useState(() => pickChar());
+  });
+
+  const [fish, setFish] = useState(() => Array.from({length: fishCount}, (_, i) => makeFish(i)));
+  const [target, setTarget] = useState(() => pickChar(charPool));
   const [caught, setCaught] = useState([]);
   const [miss, setMiss] = useState(0);
   const [feedback, setFeedback] = useState(null);
@@ -897,14 +1056,15 @@ function FishingGame({ reward, triggerParticles }) {
     if (f.char.char === target.char) {
       catchingRef.current = true;
       recordCorrect(target.char);
+      statsRef.current.correct++;
       setCaught(prev => [...prev, f.char.char]);
-      const newTarget = pickChar(target.char);
+      const newTarget = pickChar(charPool, target.char);
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
         return [...filtered, {
           id: Date.now(), char: newTarget,
           x: Math.random()*70+5, y: Math.random()*40+30,
-          speed: Math.random()*0.5+0.3, dir: Math.random()>0.5?1:-1,
+          speed: (Math.random()*0.5+0.3) * cfg.speedMult, dir: Math.random()>0.5?1:-1,
         }];
       });
       reward(20, `「${target.char}」 낚았어! 잘했어!`, "excited");
@@ -913,6 +1073,7 @@ function FishingGame({ reward, triggerParticles }) {
       setTimeout(() => { catchingRef.current = false; }, 400);
     } else {
       recordWrong(target.char);
+      statsRef.current.wrong++;
       setMiss(m => m + 1);
       triggerParticles(f.x, f.y);
       showFeedback(`「${f.char.char}」는 ${f.char.rom} 소리입니다`, false);
@@ -984,16 +1145,25 @@ function FishingGame({ reward, triggerParticles }) {
 // ============================================================
 // BALLOON GAME
 // ============================================================
-function BalloonGame({ reward, triggerParticles }) {
+function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord }) {
   const { pickChar, recordCorrect, recordWrong } = useSRS();
-  const [balloons, setBalloons] = useState(() => Array.from({length:6}, (_,i) => ({
+  const charPool = getCharPool(difficulty);
+  const cfg = resolveConfig(difficulty);
+  const balloonCount = cfg.entityCount;
+  const statsRef = useRef({ correct: 0, wrong: 0 });
+
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("balloon", statsRef.current.correct, statsRef.current.wrong); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [balloons, setBalloons] = useState(() => Array.from({length: balloonCount}, (_,i) => ({
     id: i,
-    char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
+    char: charPool[Math.floor(Math.random()*charPool.length)],
     x: Math.random()*80+5, y: 80 + Math.random()*10,
-    speed: Math.random()*0.3+0.15,
+    speed: (Math.random()*0.3+0.15) * cfg.speedMult,
     color: ["#FF69B4","#FF8C00","#4CAF50","#2196F3","#9C27B0","#FF5722"][i%6],
   })));
-  const [target, setTarget] = useState(() => pickChar());
+  const [target, setTarget] = useState(() => pickChar(charPool));
   const [score, setScore] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const animRef = useRef();
@@ -1033,7 +1203,7 @@ function BalloonGame({ reward, triggerParticles }) {
             targetVisible = true;
             return { ...orig, y: 90, x: Math.random()*80+5, char: targetRef.current };
           }
-          return { ...orig, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] };
+          return { ...orig, y: 90, x: Math.random()*80+5, char: charPool[Math.floor(Math.random()*charPool.length)] };
         });
       });
       animRef.current = requestAnimationFrame(move);
@@ -1053,7 +1223,8 @@ function BalloonGame({ reward, triggerParticles }) {
     if (b.char.char === target.char) {
       poppingRef.current = true;
       recordCorrect(target.char);
-      const newTarget = pickChar(target.char);
+      statsRef.current.correct++;
+      const newTarget = pickChar(charPool, target.char);
       setBalloons(prev => prev.map(x => x.id === b.id
         ? { ...x, y: 90, x: Math.random()*80+5, char: newTarget }
         : x
@@ -1065,6 +1236,7 @@ function BalloonGame({ reward, triggerParticles }) {
       setTimeout(() => { poppingRef.current = false; }, 400);
     } else {
       recordWrong(target.char);
+      statsRef.current.wrong++;
       triggerParticles(b.x, b.y);
       showFeedback(`「${b.char.char}」는 ${b.char.rom} 소리입니다`, false);
     }
@@ -1124,11 +1296,16 @@ function BalloonGame({ reward, triggerParticles }) {
 // ============================================================
 // DRAW SCREEN
 // ============================================================
-function DrawScreen({ reward, triggerParticles }) {
+function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord }) {
   const { pickChar, recordCorrect } = useSRS();
+  const charPool = getCharPool(difficulty);
+  const practiceRef = useRef(0);
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("draw", practiceRef.current, 0); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
-  const [target, setTarget] = useState(() => pickChar());
+  const [target, setTarget] = useState(() => pickChar(charPool));
   const [done, setDone] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const lastPos = useRef(null);
@@ -1189,7 +1366,8 @@ function DrawScreen({ reward, triggerParticles }) {
 
   const nextChar = () => {
     recordCorrect(target.char);
-    setTarget(pickChar(target.char));
+    practiceRef.current++;
+    setTarget(pickChar(charPool, target.char));
     clear();
   };
 
