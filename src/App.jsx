@@ -1252,12 +1252,18 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
     return () => { if (onRecord) onRecord("balloon", stats.correct, stats.wrong); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const BALLOON_COLORS = ["#F44336","#E91E63","#9C27B0","#2196F3","#009688","#FF9800"];
+  const laneWidth = 80 / balloonCount;
+  const laneX = (lane) => 10 + lane * laneWidth + laneWidth * 0.5 + (Math.random() - 0.5) * laneWidth * 0.4;
+
   const [balloons, setBalloons] = useState(() => Array.from({length: balloonCount}, (_,i) => ({
     id: i,
+    lane: i,
     char: charPool[Math.floor(Math.random()*charPool.length)],
-    x: Math.random()*80+5, y: 80 + Math.random()*10,
+    x: 10 + i * laneWidth + laneWidth * 0.5,
+    y: 80 + Math.random() * 15,
     speed: (Math.random()*0.3+0.15) * cfg.speedMult,
-    color: ["#FF69B4","#FF8C00","#4CAF50","#2196F3","#9C27B0","#FF5722"][i%6],
+    color: BALLOON_COLORS[i % BALLOON_COLORS.length],
   })));
   const [target, setTarget] = useState(() => pickChar(charPool));
   const [score, setScore] = useState(0);
@@ -1291,15 +1297,16 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
           }
           return null; // 교체 필요 마킹
         });
-        // 교체 필요한 풍선 처리 (target 보장)
+        // 교체 필요한 풍선 처리 (target 보장, 레인 기반 x 재배치)
         return next.map((b, i) => {
           if (b !== null) return b;
           const orig = prev[i];
+          const newX = 10 + orig.lane * laneWidth + laneWidth * 0.5 + (Math.random() - 0.5) * laneWidth * 0.4;
           if (!targetVisible) {
             targetVisible = true;
-            return { ...orig, y: 90, x: Math.random()*80+5, char: targetRef.current };
+            return { ...orig, y: 95, x: newX, char: targetRef.current };
           }
-          return { ...orig, y: 90, x: Math.random()*80+5, char: charPool[Math.floor(Math.random()*charPool.length)] };
+          return { ...orig, y: 95, x: newX, char: charPool[Math.floor(Math.random()*charPool.length)] };
         });
       });
       animRef.current = requestAnimationFrame(move);
@@ -1322,7 +1329,7 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
       statsRef.current.correct++;
       const newTarget = pickChar(charPool, target.char);
       setBalloons(prev => prev.map(x => x.id === b.id
-        ? { ...x, y: 90, x: Math.random()*80+5, char: newTarget }
+        ? { ...x, y: 95, x: 10 + b.lane * laneWidth + laneWidth * 0.5 + (Math.random() - 0.5) * laneWidth * 0.4, char: newTarget }
         : x
       ));
       reward(15, "빵! 맞췄어! 🎉", "excited");
@@ -1358,16 +1365,42 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
             position: "absolute",
             left: `${b.x}%`, top: `${b.y}%`,
             transform: "translateX(-50%) translateY(-50%)",
-            background: "none", border: "none", cursor: "pointer",
+            background: "none", border: "none", cursor: "pointer", padding: 0,
             display: "flex", flexDirection: "column", alignItems: "center",
-            fontSize: 44,
           }}>
-            <span style={{ display: "block", lineHeight: 1 }}>🎈</span>
-            <span style={{
-              position: "absolute", top: 4, left: "50%", transform: "translateX(-50%)",
-              fontSize: 13, fontFamily: "sans-serif", fontWeight: 900,
-              color: b.color, textShadow: "0 1px 3px white",
-            }}>{b.char.rom}</span>
+            {/* 풍선 몸통 */}
+            <div style={{
+              width: 58, height: 64,
+              background: `radial-gradient(circle at 35% 35%, ${b.color}CC, ${b.color})`,
+              borderRadius: "50% 50% 50% 50% / 55% 55% 45% 45%",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `inset -5px -5px 10px rgba(0,0,0,0.2), inset 5px 5px 10px rgba(255,255,255,0.3), 0 4px 12px rgba(0,0,0,0.25)`,
+              position: "relative",
+            }}>
+              {/* 반사광 */}
+              <div style={{
+                position: "absolute", top: 10, left: 14,
+                width: 14, height: 10,
+                background: "rgba(255,255,255,0.5)",
+                borderRadius: "50%", transform: "rotate(-30deg)",
+              }} />
+              <span style={{
+                fontSize: 15, fontWeight: 900, color: "white",
+                textShadow: "0 1px 4px rgba(0,0,0,0.6)",
+                fontFamily: "'Nunito', sans-serif",
+                letterSpacing: 0,
+              }}>{b.char.rom}</span>
+            </div>
+            {/* 풍선 꼭지 */}
+            <div style={{
+              width: 0, height: 0,
+              borderLeft: "4px solid transparent",
+              borderRight: "4px solid transparent",
+              borderTop: `8px solid ${b.color}`,
+              marginTop: -1,
+            }} />
+            {/* 실 */}
+            <div style={{ width: 1.5, height: 12, background: "#aaa" }} />
           </button>
         ))}
       </div>
