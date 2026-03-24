@@ -806,9 +806,11 @@ function FishingGame({ reward, triggerParticles }) {
   const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [caught, setCaught] = useState([]);
   const [miss, setMiss] = useState(0);
+  const [feedback, setFeedback] = useState(null);
   const animRef = useRef();
   const catchingRef = useRef(false);
   const targetRef = useRef(target);
+  const feedbackTimerRef = useRef();
 
   useEffect(() => { targetRef.current = target; }, [target]);
 
@@ -834,13 +836,18 @@ function FishingGame({ reward, triggerParticles }) {
     return () => cancelAnimationFrame(animRef.current);
   }, []);
 
+  const showFeedback = (msg, correct) => {
+    clearTimeout(feedbackTimerRef.current);
+    setFeedback({ msg, correct });
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
+  };
+
   const catchFish = (f) => {
     if (catchingRef.current) return;
     if (f.char.char === target.char) {
       catchingRef.current = true;
       setCaught(prev => [...prev, f.char.char]);
       const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
-      // 잡힌 자리에 새 target 물고기 배치 → 항상 화면에 target 존재
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
         return [...filtered, {
@@ -850,11 +857,13 @@ function FishingGame({ reward, triggerParticles }) {
         }];
       });
       reward(20, `「${target.char}」 낚았어! 잘했어!`, "excited");
+      showFeedback(`${target.char} → ${target.rom} (정답!)`, true);
       setTarget(newTarget);
       setTimeout(() => { catchingRef.current = false; }, 400);
     } else {
       setMiss(m => m + 1);
       triggerParticles(f.x, f.y);
+      showFeedback(`「${f.char.char}」는 ${f.char.rom} 소리입니다`, false);
     }
   };
 
@@ -902,7 +911,17 @@ function FishingGame({ reward, triggerParticles }) {
         ))}
       </div>
 
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between" }}>
+      {feedback && (
+        <div style={{
+          marginTop: 10, padding: "8px 14px", borderRadius: 12, textAlign: "center",
+          fontWeight: 700, fontSize: 14,
+          background: feedback.correct ? "#E8F5E9" : "#FFF3E0",
+          color: feedback.correct ? "#2E7D32" : "#E65100",
+          border: `2px solid ${feedback.correct ? "#66BB6A" : "#FFA726"}`,
+        }}>{feedback.msg}</div>
+      )}
+
+      <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between" }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#2196F3" }}>✅ 잡은 것: {caught.length}마리</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#FF5252" }}>❌ 실수: {miss}번</div>
       </div>
@@ -923,9 +942,11 @@ function BalloonGame({ reward, triggerParticles }) {
   })));
   const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [score, setScore] = useState(0);
+  const [feedback, setFeedback] = useState(null);
   const animRef = useRef();
   const poppingRef = useRef(false);
   const targetRef = useRef(target);
+  const feedbackTimerRef = useRef();
 
   // targetRef를 항상 최신 target으로 동기화
   useEffect(() => { targetRef.current = target; }, [target]);
@@ -968,22 +989,29 @@ function BalloonGame({ reward, triggerParticles }) {
     return () => cancelAnimationFrame(animRef.current);
   }, []);
 
+  const showFeedback = (msg, correct) => {
+    clearTimeout(feedbackTimerRef.current);
+    setFeedback({ msg, correct });
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
+  };
+
   const pop = (b, e) => {
     if (poppingRef.current) return;
     if (b.char.char === target.char) {
       poppingRef.current = true;
       const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
-      // 터진 자리에 새 target 글자 배치 → 항상 화면에 target 존재
       setBalloons(prev => prev.map(x => x.id === b.id
         ? { ...x, y: 90, x: Math.random()*80+5, char: newTarget }
         : x
       ));
       reward(15, "빵! 맞췄어! 🎉", "excited");
+      showFeedback(`${target.char} → ${target.rom} (정답!)`, true);
       setScore(s => s + 1);
       setTarget(newTarget);
       setTimeout(() => { poppingRef.current = false; }, 400);
     } else {
       triggerParticles(b.x, b.y);
+      showFeedback(`「${b.char.char}」는 ${b.char.rom} 소리입니다`, false);
     }
   };
 
@@ -1021,7 +1049,17 @@ function BalloonGame({ reward, triggerParticles }) {
         ))}
       </div>
 
-      <div style={{ marginTop: 10, textAlign: "center", fontSize: 14, fontWeight: 800, color: "#9C27B0" }}>
+      {feedback && (
+        <div style={{
+          marginTop: 10, padding: "8px 14px", borderRadius: 12, textAlign: "center",
+          fontWeight: 700, fontSize: 14,
+          background: feedback.correct ? "#E8F5E9" : "#FFF3E0",
+          color: feedback.correct ? "#2E7D32" : "#E65100",
+          border: `2px solid ${feedback.correct ? "#66BB6A" : "#FFA726"}`,
+        }}>{feedback.msg}</div>
+      )}
+
+      <div style={{ marginTop: 8, textAlign: "center", fontSize: 14, fontWeight: 800, color: "#9C27B0" }}>
         터트린 풍선: {score}개 🎈
       </div>
     </div>
