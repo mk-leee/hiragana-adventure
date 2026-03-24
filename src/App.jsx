@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import pkg from "../package.json";
 const version = pkg.version;
 
@@ -915,7 +915,7 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
 // ============================================================
 function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, difficulty = "normal", onRecord }) {
   const { pickChar, recordCorrect, recordWrong } = useSRS();
-  const charPool = getCharPool(difficulty);
+  const charPool = useMemo(() => getCharPool(difficulty), [difficulty]); // stable ref
   const [current, setCurrent] = useState(() => pickChar(charPool));
   const [choices, setChoices] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -934,18 +934,18 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
     const others = charPool.filter(h => h.char !== correct.char)
       .sort(() => Math.random()-0.5).slice(0,3);
     return [correct, ...others].sort(() => Math.random()-0.5);
-  }, [charPool]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [charPool]);
 
+  // choices는 current가 바뀔 때만 재생성 (makeChoices도 charPool이 변할 때만 재생성)
   useEffect(() => {
     setChoices(makeChoices(current));
   }, [current, makeChoices]);
 
   const next = useCallback((exclude = null) => {
     const n = pickChar(charPool, exclude);
-    setCurrent(n);
-    setChoices(makeChoices(n));
+    setCurrent(n); // useEffect가 choices를 갱신함 — 여기서 setChoices 호출 불필요
     setSelected(null);
-  }, [pickChar, charPool, makeChoices]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pickChar, charPool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (c) => {
     if (processingRef.current || selected) return;
