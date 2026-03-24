@@ -973,7 +973,7 @@ function BalloonGame({ reward, triggerParticles }) {
 function DrawScreen({ reward, triggerParticles }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
-  const [target] = useState(HIRAGANA[Math.floor(Math.random()*10)]);
+  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [done, setDone] = useState(false);
   const lastPos = useRef(null);
 
@@ -1028,6 +1028,13 @@ function DrawScreen({ reward, triggerParticles }) {
     setDone(false);
   };
 
+  const nextChar = () => {
+    let next;
+    do { next = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]; } while (next.char === target.char);
+    setTarget(next);
+    clear();
+  };
+
   return (
     <div>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
@@ -1066,7 +1073,12 @@ function DrawScreen({ reward, triggerParticles }) {
       {done && (
         <div style={{ textAlign: "center", marginTop: 16, animation: "bounce-in 0.5s ease" }}>
           <div style={{ fontSize: 40 }}>🎉⭐🌟⭐🎉</div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: "#4CAF50" }}>훌륭해요! +20포인트!</div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: "#4CAF50", marginBottom: 10 }}>훌륭해요! +20포인트!</div>
+          <button onClick={nextChar} style={{
+            padding: "12px 28px", borderRadius: 14, fontSize: 15, fontWeight: 800,
+            background: "linear-gradient(135deg, #FF8C00, #FFB300)", color: "white",
+            border: "none", boxShadow: "0 4px 12px rgba(255,140,0,0.4)",
+          }}>다음 글자 ➡</button>
         </div>
       )}
     </div>
