@@ -497,9 +497,12 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
 // ============================================================
 function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, setFoxMessage, triggerParticles }) {
   const [currentChapter, setCurrentChapter] = useState(null);
+  const [currentChapterIndex, setCurrentChapterIndex] = useState(null);
   const [charIndex, setCharIndex] = useState(0);
   const [lessonStep, setLessonStep] = useState(0); // 0:chapter list  1:learn  2:quiz  3:complete
-  const [quizResult, setQuizResult] = useState(null);
+  const [quizResult, setQuizResult] = useState(null); // null | "correct" | "wrong"
+  const [wrongChoice, setWrongChoice] = useState(null);
+  const [unlockedChapters, setUnlockedChapters] = useState(() => CHAPTERS.map(ch => ch.unlocked));
 
   const lessonChar = currentChapter ? currentChapter.chars[charIndex] : null;
 
@@ -509,9 +512,17 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
       setCharIndex(i => i + 1);
       setLessonStep(1);
     } else {
+      // 다음 챕터 언락
+      setUnlockedChapters(prev => {
+        const next = [...prev];
+        if (currentChapterIndex + 1 < CHAPTERS.length) {
+          next[currentChapterIndex + 1] = true;
+        }
+        return next;
+      });
       setLessonStep(3); // chapter complete
     }
-  }, [charIndex, currentChapter]);
+  }, [charIndex, currentChapter, currentChapterIndex]);
 
   if (lessonStep === 3) {
     return (
@@ -592,24 +603,26 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
               if (quizResult) return;
               if (c === char.rom) {
                 setQuizResult("correct");
+                setWrongChoice(null);
                 if (!completedChars.includes(char.char)) {
                   setCompletedChars(prev => [...prev, char.char]);
                 }
                 reward(15, `${PRAISE[Math.floor(Math.random()*PRAISE.length)]} 맞았어!`, "excited");
-                setTimeout(() => goNextChar(), 1200);
+                setTimeout(() => { setQuizResult(null); setWrongChoice(null); goNextChar(); }, 1200);
               } else {
                 setQuizResult("wrong");
-                setTimeout(() => setQuizResult(null), 1000);
+                setWrongChoice(c);
+                setTimeout(() => { setQuizResult(null); setWrongChoice(null); }, 1000);
               }
             }} style={{
               padding: "20px 10px",
               borderRadius: 16,
               fontSize: 20, fontWeight: 900,
               background: quizResult === "correct" && c === char.rom ? "#4CAF50" :
-                          quizResult === "wrong"   && c !== char.rom ? "#FF5252" :
+                          quizResult === "wrong"   && c === wrongChoice ? "#FF5252" :
                           "white",
               color: quizResult === "correct" && c === char.rom ? "white" :
-                     quizResult === "wrong"   && c !== char.rom ? "white" : "#333",
+                     quizResult === "wrong"   && c === wrongChoice ? "white" : "#333",
               border: "3px solid #FFD700",
               boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               transition: "all 0.2s",
@@ -625,33 +638,37 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
       <div style={{ fontSize: 16, fontWeight: 900, color: "#FF8C00", marginBottom: 12, textAlign: "center" }}>
         📖 히라코와 일본 여행 — 챕터 선택
       </div>
-      {CHAPTERS.map((ch, i) => (
-        <button key={i} onClick={() => {
-          if (!ch.unlocked && i > 0) return;
-          setCurrentChapter(ch);
-          setCharIndex(0);
-          setLessonStep(1);
-        }} style={{
-          width: "100%", marginBottom: 10,
-          background: ch.unlocked ? "linear-gradient(135deg, #FFF9E6, #FFF3CC)" : "#EEE",
-          border: ch.unlocked ? "3px solid #FFD700" : "3px solid #CCC",
-          borderRadius: 16, padding: "14px 16px",
-          display: "flex", alignItems: "center", gap: 12,
-          opacity: ch.unlocked || i === 0 ? 1 : 0.5,
-          boxShadow: ch.unlocked ? "0 4px 12px rgba(255,215,0,0.3)" : "none",
-        }}>
-          <div style={{ fontSize: 32 }}>{ch.unlocked || i===0 ? "🗺️" : "🔒"}</div>
-          <div style={{ textAlign: "left", flex: 1 }}>
-            <div style={{ fontWeight: 900, fontSize: 14, color: ch.unlocked||i===0 ? "#FF8C00" : "#999" }}>
-              Week {ch.week}: {ch.title}
+      {CHAPTERS.map((ch, i) => {
+        const isUnlocked = unlockedChapters[i];
+        return (
+          <button key={i} onClick={() => {
+            if (!isUnlocked) return;
+            setCurrentChapter(ch);
+            setCurrentChapterIndex(i);
+            setCharIndex(0);
+            setLessonStep(1);
+          }} style={{
+            width: "100%", marginBottom: 10,
+            background: isUnlocked ? "linear-gradient(135deg, #FFF9E6, #FFF3CC)" : "#EEE",
+            border: isUnlocked ? "3px solid #FFD700" : "3px solid #CCC",
+            borderRadius: 16, padding: "14px 16px",
+            display: "flex", alignItems: "center", gap: 12,
+            opacity: isUnlocked ? 1 : 0.5,
+            boxShadow: isUnlocked ? "0 4px 12px rgba(255,215,0,0.3)" : "none",
+          }}>
+            <div style={{ fontSize: 32 }}>{isUnlocked ? "🗺️" : "🔒"}</div>
+            <div style={{ textAlign: "left", flex: 1 }}>
+              <div style={{ fontWeight: 900, fontSize: 14, color: isUnlocked ? "#FF8C00" : "#999" }}>
+                Week {ch.week}: {ch.title}
+              </div>
+              <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
+                {ch.chars.join(" · ")}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
-              {ch.chars.join(" · ")}
-            </div>
-          </div>
-          <div style={{ fontSize: 18 }}>{ch.unlocked || i===0 ? "▶" : "🔒"}</div>
-        </button>
-      ))}
+            <div style={{ fontSize: 18 }}>{isUnlocked ? "▶" : "🔒"}</div>
+          </button>
+        );
+      })}
     </div>
   );
 }
