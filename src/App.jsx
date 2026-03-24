@@ -1779,7 +1779,7 @@ function Stage4Input({ chars, onComplete }) {
       }}>
         <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && submit()}
-          placeholder={`예: ${cur.rom}`}
+          placeholder="입력하세요"
           style={{
             width: "100%", border: "none", outline: "none",
             fontSize: 26, fontWeight: 900, textAlign: "center", background: "transparent",
