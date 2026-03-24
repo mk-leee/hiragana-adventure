@@ -234,7 +234,7 @@ const USERS = [
 
 function getDefaultUserData() {
   return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡", streak: 0,
-           difficulty: "auto", playHistory: [] };
+           difficulty: "auto", playHistory: [], charStages: {} };
 }
 
 function savePlayRecord(userId, game, correct, wrong) {
@@ -448,11 +448,12 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
   const [wrongPin, setWrongPin] = useState(false);
   const [notification, setNotification] = useState(null);
   const [rewardMultiplier, setRewardMultiplier] = useState(() => loadParentSettings().rewardMultiplier);
+  const [charStages, setCharStages] = useState(userData.charStages || {});
 
   // Save to localStorage whenever key data changes
   useEffect(() => {
-    saveUserData(userId, { points, candies, completedChars, owned, currentRoom, streak });
-  }, [userId, points, candies, completedChars, owned, currentRoom, streak]);
+    saveUserData(userId, { points, candies, completedChars, owned, currentRoom, streak, charStages });
+  }, [userId, points, candies, completedChars, owned, currentRoom, streak, charStages]);
 
   const triggerParticles = useCallback((x = 50, y = 50) => {
     setParticlePos({ x, y });
@@ -480,6 +481,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
   const showScreen = (s) => {
     setScreen(s);
     setFoxMessage(
+      s === "funnel" ? "4단계로 완벽 마스터해보자! 📚" :
       s === "story" ? "모험을 시작해볼까? 두근두근~" :
       s === "quiz"  ? "퀴즈 준비됐어? 할 수 있어!" :
       s === "fishing" ? "낚시로 히라가나 잡아보자! 🎣" :
@@ -576,7 +578,8 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
 
 
       <div style={{ padding: 16 }}>
-        {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} />}
+        {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} charStages={charStages} />}
+        {screen === "funnel" && <LearningFunnelScreen reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} charStages={charStages} setCharStages={setCharStages} onHome={() => showScreen("home")} />}
         {screen === "story" && <StoryScreen reward={reward} completedChars={completedChars} setCompletedChars={setCompletedChars} foxMood={foxMood} setFoxMood={setFoxMood} setFoxMessage={setFoxMessage} triggerParticles={triggerParticles} />}
         {screen === "quiz" && <QuizScreen reward={reward} triggerParticles={triggerParticles} setFoxMessage={setFoxMessage} setFoxMood={setFoxMood} difficulty={difficulty} onRecord={onRecord} />}
         {screen === "fishing" && <FishingGame reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
@@ -602,10 +605,13 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
 // ============================================================
 // HOME SCREEN
 // ============================================================
-function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage, foxMood, setScreen }) {
+function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage, foxMood, setScreen, charStages }) {
   const progress = (completedChars.length / HIRAGANA.length) * 100;
+  const stageCounts = [0,0,0,0,0];
+  HIRAGANA.forEach(h => { stageCounts[charStages[h.char] || 0]++; });
 
   const menus = [
+    { id: "funnel",  icon: "📚", label: "단계별 학습",   color: "#FF6F00", bg: "#FFF8E1", highlight: true },
     { id: "story",   icon: "📖", label: "스토리 모험",   color: "#FF8C00", bg: "#FFF3E0" },
     { id: "quiz",    icon: "🎯", label: "퀴즈 도전",     color: "#E91E63", bg: "#FCE4EC" },
     { id: "fishing", icon: "🎣", label: "낚시 게임",     color: "#2196F3", bg: "#E3F2FD" },
@@ -648,6 +654,20 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
         </div>
       </div>
 
+      {/* FUNNEL PROGRESS */}
+      <div style={{ background: "white", borderRadius: 20, padding: "14px 16px", marginBottom: 14, border: "2px solid #FFE0B2", boxShadow: "0 2px 12px rgba(255,111,0,0.1)" }}>
+        <div style={{ fontWeight: 900, fontSize: 13, color: "#FF6F00", marginBottom: 10 }}>📚 단계별 학습 현황</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[{n:0,label:"미학습",color:"#E0E0E0"},{n:1,label:"매칭",color:"#FF8C00"},{n:2,label:"인식",color:"#2196F3"},{n:3,label:"듣기",color:"#9C27B0"},{n:4,label:"마스터",color:"#4CAF50"}].map(s => (
+            <div key={s.n} style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontWeight: 900, fontSize: 16, color: s.color }}>{stageCounts[s.n]}</div>
+              <div style={{ height: 6, background: s.color, borderRadius: 4, opacity: 0.7, marginTop: 2 }}/>
+              <div style={{ fontSize: 9, color: "#AAA", fontWeight: 700, marginTop: 3 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* MENU GRID */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
         {menus.map(m => (
@@ -657,16 +677,18 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
             borderRadius: 20, padding: "18px 12px",
             display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
             transition: "transform 0.15s, box-shadow 0.15s",
-            boxShadow: `0 4px 14px ${m.color}40`,
+            boxShadow: m.highlight ? `0 6px 20px ${m.color}60` : `0 4px 14px ${m.color}40`,
             animation: "slide-up 0.5s ease both",
+            gridColumn: m.highlight ? "1 / -1" : undefined,
           }}
           onMouseDown={e => e.currentTarget.style.transform = "scale(0.95)"}
           onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
           onTouchStart={e => e.currentTarget.style.transform = "scale(0.95)"}
           onTouchEnd={e => e.currentTarget.style.transform = "scale(1)"}
           >
-            <span style={{ fontSize: 36 }}>{m.icon}</span>
-            <span style={{ fontSize: 13, fontWeight: 900, color: m.color }}>{m.label}</span>
+            <span style={{ fontSize: m.highlight ? 42 : 36 }}>{m.icon}</span>
+            <span style={{ fontSize: m.highlight ? 15 : 13, fontWeight: 900, color: m.color }}>{m.label}</span>
+            {m.highlight && <span style={{ fontSize: 11, color: m.color, opacity: 0.7, fontWeight: 700 }}>매칭 → 인식 → 듣기 → 쓰기</span>}
           </button>
         ))}
       </div>
@@ -1418,6 +1440,371 @@ function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord 
           }}>다음 글자 ➡</button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// LEARNING FUNNEL
+// ============================================================
+function speak(text) {
+  try {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ja-JP"; u.rate = 0.8;
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
+function FunnelStageBar({ stage }) {
+  const stages = [
+    { n: 1, icon: "🔗", label: "매칭" },
+    { n: 2, icon: "👁", label: "인식" },
+    { n: 3, icon: "👂", label: "듣기" },
+    { n: 4, icon: "✏️", label: "쓰기" },
+  ];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 18 }}>
+      {stages.map((s, i) => (
+        <div key={s.n} style={{ display: "flex", alignItems: "center", flex: 1, flexDirection: "column" }}>
+          <div style={{
+            width: "100%", padding: "8px 4px", borderRadius: 12, textAlign: "center",
+            background: stage > s.n ? "#4CAF50" : stage === s.n ? "linear-gradient(135deg,#FF8C00,#FF6347)" : "#E8E8E8",
+            color: stage >= s.n ? "white" : "#AAA", fontWeight: 900, fontSize: 11,
+            boxShadow: stage === s.n ? "0 3px 10px rgba(255,140,0,0.45)" : "none",
+          }}>
+            <div style={{ fontSize: 15, marginBottom: 2 }}>{stage > s.n ? "✓" : s.icon}</div>
+            <div>{s.label}</div>
+          </div>
+          {i < 3 && <div style={{ fontSize: 9, color: "#CCC", marginTop: 2 }}>▼</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 단계 1: 매칭 — 히라가나 ↔ 로마자 짝 맞추기
+function Stage1Matching({ chars, onComplete }) {
+  const [romOrder] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [leftSel, setLeftSel] = useState(null);
+  const [rightSel, setRightSel] = useState(null);
+  const [matched, setMatched] = useState(new Set());
+  const [flash, setFlash] = useState(null);
+
+  const handleLeft = (i) => {
+    if (matched.has(chars[i].char) || flash) return;
+    setLeftSel(i); setRightSel(null);
+  };
+
+  const handleRight = (i) => {
+    if (matched.has(romOrder[i].char) || flash) return;
+    if (leftSel === null) { setRightSel(i); return; }
+    if (chars[leftSel].char === romOrder[i].char) {
+      const next = new Set(matched); next.add(chars[leftSel].char);
+      setMatched(next); setFlash("ok");
+      setTimeout(() => {
+        setFlash(null); setLeftSel(null); setRightSel(null);
+        if (next.size === chars.length) setTimeout(onComplete, 500);
+      }, 500);
+    } else {
+      setRightSel(i); setFlash("no");
+      setTimeout(() => { setFlash(null); setLeftSel(null); setRightSel(null); }, 700);
+    }
+  };
+
+  const cardBase = (isMatched, isSel, side) => ({
+    width: "100%", padding: "12px 6px", marginBottom: 8, borderRadius: 14,
+    fontWeight: 900, textAlign: "center", cursor: isMatched ? "default" : "pointer",
+    fontSize: side === "left" ? 30 : 16,
+    fontFamily: side === "left" ? "'Noto Sans JP', sans-serif" : "sans-serif",
+    border: `3px solid ${isMatched ? "#4CAF50" : isSel ? (flash === "no" ? "#F44336" : "#FF8C00") : "#DDD"}`,
+    background: isMatched ? "#E8F5E9" : isSel ? (flash === "no" ? "#FFEBEE" : "#FFF8E1") : "white",
+    color: isMatched ? "#388E3C" : isSel ? (flash === "no" ? "#C62828" : "#E65100") : "#333",
+    opacity: isMatched ? 0.55 : 1, transition: "all 0.15s",
+  });
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 13, color: "#888", fontWeight: 700, marginBottom: 14 }}>
+        히라가나와 발음을 짝지어 보세요 ✅ {matched.size}/{chars.length}
+      </div>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          {chars.map((c, i) => (
+            <button key={c.char} onClick={() => handleLeft(i)} style={cardBase(matched.has(c.char), leftSel === i, "left")}>
+              {c.char}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", paddingTop: 20, color: "#CCC", fontSize: 22 }}>↔</div>
+        <div style={{ flex: 1 }}>
+          {romOrder.map((c, i) => (
+            <button key={c.rom+i} onClick={() => handleRight(i)} style={cardBase(matched.has(c.char), rightSel === i, "right")}>
+              {c.rom}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 단계 2: 인식 — 히라가나 보고 발음 선택
+function Stage2Recognition({ chars, onComplete }) {
+  const mkChoices = (c) => [c, ...chars.filter(h => h.char !== c.char).sort(() => Math.random()-0.5).slice(0,3)].sort(() => Math.random()-0.5);
+  const [queue] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [idx, setIdx] = useState(0);
+  const [choices, setChoices] = useState(() => mkChoices(chars[0]));
+  const [sel, setSel] = useState(null);
+
+  const pick = (c) => {
+    if (sel) return;
+    setSel(c);
+    setTimeout(() => {
+      if (idx + 1 >= queue.length) { onComplete(); return; }
+      setChoices(mkChoices(queue[idx + 1]));
+      setIdx(i => i + 1); setSel(null);
+    }, 900);
+  };
+
+  const cur = queue[idx];
+  const isOk = (c) => sel && c.char === cur.char;
+  const isNg = (c) => sel && sel.char === c.char && c.char !== cur.char;
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#AAA", fontWeight: 700, marginBottom: 8 }}>{idx+1} / {queue.length}</div>
+      <div style={{ textAlign: "center", marginBottom: 22 }}>
+        <div style={{ fontSize: 76, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, color: "#222", lineHeight: 1.1 }}>{cur.char}</div>
+        <div style={{ fontSize: 13, color: "#AAA", fontWeight: 700, marginTop: 4 }}>이 글자의 발음은?</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {choices.map(c => (
+          <button key={c.char} onClick={() => pick(c)} style={{
+            padding: "16px 8px", borderRadius: 16, fontWeight: 900, fontSize: 20,
+            border: `3px solid ${isOk(c) ? "#4CAF50" : isNg(c) ? "#F44336" : "#DDD"}`,
+            background: isOk(c) ? "#E8F5E9" : isNg(c) ? "#FFEBEE" : "white",
+            color: isOk(c) ? "#2E7D32" : isNg(c) ? "#C62828" : "#333",
+          }}>{c.rom}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 단계 3: 듣기 — 소리 듣고 히라가나 선택
+function Stage3Listening({ chars, onComplete }) {
+  const mkChoices = (c) => [c, ...chars.filter(h => h.char !== c.char).sort(() => Math.random()-0.5).slice(0,3)].sort(() => Math.random()-0.5);
+  const [queue] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [idx, setIdx] = useState(0);
+  const [choices, setChoices] = useState(() => mkChoices(chars[0]));
+  const [sel, setSel] = useState(null);
+  const [playing, setPlaying] = useState(false);
+
+  const cur = queue[idx];
+  const playSound = useCallback(() => {
+    setPlaying(true); speak(cur.char);
+    setTimeout(() => setPlaying(false), 1000);
+  }, [cur]);
+
+  useEffect(() => { setTimeout(playSound, 350); }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pick = (c) => {
+    if (sel) return;
+    setSel(c);
+    setTimeout(() => {
+      if (idx + 1 >= queue.length) { onComplete(); return; }
+      setChoices(mkChoices(queue[idx + 1]));
+      setIdx(i => i + 1); setSel(null);
+    }, 900);
+  };
+
+  const isOk = (c) => sel && c.char === cur.char;
+  const isNg = (c) => sel && sel.char === c.char && c.char !== cur.char;
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#AAA", fontWeight: 700, marginBottom: 8 }}>{idx+1} / {queue.length}</div>
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <button onClick={playSound} style={{
+          fontSize: 52, padding: "16px 28px", borderRadius: 24,
+          background: playing ? "#FFF3E0" : "white",
+          border: `3px solid ${playing ? "#FF8C00" : "#DDD"}`,
+          boxShadow: playing ? "0 0 20px rgba(255,140,0,0.3)" : "0 2px 8px rgba(0,0,0,0.07)",
+          animation: playing ? "pulse 0.5s infinite" : "none",
+        }}>🔊</button>
+        <div style={{ fontSize: 12, color: "#AAA", fontWeight: 700, marginTop: 6 }}>탭하여 다시 듣기</div>
+      </div>
+      <div style={{ fontSize: 13, color: "#888", fontWeight: 700, textAlign: "center", marginBottom: 12 }}>
+        들은 소리에 해당하는 히라가나를 선택하세요
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {choices.map(c => (
+          <button key={c.char} onClick={() => pick(c)} style={{
+            padding: "16px 8px", borderRadius: 16, fontWeight: 900, fontSize: 34,
+            fontFamily: "'Noto Sans JP', sans-serif",
+            border: `3px solid ${isOk(c) ? "#4CAF50" : isNg(c) ? "#F44336" : "#DDD"}`,
+            background: isOk(c) ? "#E8F5E9" : isNg(c) ? "#FFEBEE" : "white",
+            color: isOk(c) ? "#2E7D32" : isNg(c) ? "#C62828" : "#333",
+          }}>{c.char}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 단계 4: 쓰기 — 히라가나 보고 발음 입력
+function Stage4Input({ chars, onComplete }) {
+  const [queue] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [idx, setIdx] = useState(0);
+  const [input, setInput] = useState("");
+  const [result, setResult] = useState(null);
+  const inputRef = useRef();
+
+  useEffect(() => {
+    setInput(""); setResult(null);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [idx]);
+
+  const cur = queue[idx];
+
+  const submit = () => {
+    if (result) return;
+    const ok = input.trim().toLowerCase() === cur.rom.toLowerCase();
+    setResult(ok ? "ok" : "ng");
+    if (ok) {
+      setTimeout(() => {
+        if (idx + 1 >= queue.length) onComplete();
+        else setIdx(i => i + 1);
+      }, 800);
+    } else {
+      setTimeout(() => { setResult(null); setInput(""); }, 1300);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#AAA", fontWeight: 700, marginBottom: 8 }}>{idx+1} / {queue.length}</div>
+      <div style={{ textAlign: "center", marginBottom: 22 }}>
+        <div style={{ fontSize: 76, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, color: "#222", lineHeight: 1.1 }}>{cur.char}</div>
+        <div style={{ fontSize: 13, color: "#AAA", fontWeight: 700, marginTop: 4 }}>로마자로 입력하세요</div>
+      </div>
+      <div style={{
+        borderRadius: 16, border: `3px solid ${result === "ok" ? "#4CAF50" : result === "ng" ? "#F44336" : "#DDD"}`,
+        background: result === "ok" ? "#E8F5E9" : result === "ng" ? "#FFEBEE" : "white",
+        padding: "4px 16px", marginBottom: 10, transition: "all 0.2s",
+      }}>
+        <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          placeholder={`예: ${cur.rom}`}
+          style={{
+            width: "100%", border: "none", outline: "none",
+            fontSize: 26, fontWeight: 900, textAlign: "center", background: "transparent",
+            padding: "12px 0",
+            color: result === "ok" ? "#2E7D32" : result === "ng" ? "#C62828" : "#333",
+          }}
+        />
+      </div>
+      {result === "ng" && (
+        <div style={{ textAlign: "center", color: "#E65100", fontWeight: 800, fontSize: 13, marginBottom: 8 }}>
+          정답은 「{cur.rom}」 입니다
+        </div>
+      )}
+      <button onClick={submit} style={{
+        width: "100%", padding: "14px", borderRadius: 16, fontSize: 16, fontWeight: 900,
+        background: "linear-gradient(90deg, #FF8C00, #FF6347)", color: "white", border: "none",
+        boxShadow: "0 4px 14px rgba(255,140,0,0.35)",
+      }}>확인 ✓</button>
+    </div>
+  );
+}
+
+// 메인 학습 퍼널 화면
+function LearningFunnelScreen({ reward, triggerParticles, difficulty, onRecord, charStages, setCharStages, onHome }) {
+  const { pickChar, recordCorrect } = useSRS();
+  const charPool = getCharPool(difficulty);
+
+  const [sessionChars] = useState(() => {
+    const picked = [];
+    for (let i = 0; i < 5; i++) picked.push(pickChar(charPool, picked[picked.length-1]?.char));
+    return picked;
+  });
+  const [stage, setStage] = useState(1);
+  const [transitioning, setTransitioning] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleStageComplete = (n) => {
+    setTransitioning(true);
+    setCharStages(prev => {
+      const next = { ...prev };
+      sessionChars.forEach(c => { next[c.char] = Math.max(next[c.char] || 0, n); });
+      return next;
+    });
+    setTimeout(() => {
+      setTransitioning(false);
+      if (n < 4) setStage(n + 1);
+      else {
+        sessionChars.forEach(c => recordCorrect(c.char));
+        reward(60, "4단계 완료! 완벽 마스터! 🏆", "excited");
+        if (onRecord) onRecord("funnel", 5, 0);
+        setDone(true);
+      }
+    }, 1200);
+  };
+
+  if (done) return (
+    <div style={{ textAlign: "center", animation: "bounce-in 0.5s ease" }}>
+      <div style={{ fontSize: 64, marginBottom: 8 }}>🏆</div>
+      <div style={{ fontSize: 22, fontWeight: 900, color: "#FF8C00", marginBottom: 4 }}>4단계 완료!</div>
+      <div style={{ fontSize: 14, color: "#888", marginBottom: 20 }}>오늘 마스터한 글자</div>
+      <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, marginBottom: 28 }}>
+        {sessionChars.map(c => (
+          <div key={c.char} style={{ padding: "12px 16px", background: "#E8F5E9", border: "2px solid #4CAF50", borderRadius: 16, textAlign: "center" }}>
+            <div style={{ fontSize: 32, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900 }}>{c.char}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#2E7D32" }}>{c.rom}</div>
+          </div>
+        ))}
+      </div>
+      <button onClick={() => { setDone(false); setStage(1); }} style={{
+        width: "100%", padding: "14px", borderRadius: 16, fontSize: 16, fontWeight: 900,
+        background: "linear-gradient(90deg, #FF8C00, #FF6347)", color: "white", border: "none",
+        boxShadow: "0 4px 14px rgba(255,140,0,0.35)", marginBottom: 10,
+      }}>새 세션 🔄</button>
+      <button onClick={onHome} style={{
+        width: "100%", padding: "14px", borderRadius: 16, fontSize: 15, fontWeight: 800,
+        background: "#EEE", color: "#666", border: "2px solid #CCC",
+      }}>홈으로</button>
+    </div>
+  );
+
+  if (transitioning) return (
+    <div style={{ textAlign: "center", padding: "70px 0", animation: "bounce-in 0.4s ease" }}>
+      <div style={{ fontSize: 60 }}>{["🔗","👁","👂","✏️"][stage-1]}</div>
+      <div style={{ fontSize: 20, fontWeight: 900, color: "#FF8C00", marginTop: 12 }}>{stage}단계 완료!</div>
+      <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>훌륭해요! 다음 단계로 이동 중...</div>
+    </div>
+  );
+
+  return (
+    <div>
+      <FunnelStageBar stage={stage} />
+      <div style={{ background: "white", borderRadius: 20, padding: 18, boxShadow: "0 4px 20px rgba(0,0,0,0.07)", border: "2px solid #F0F0F0" }}>
+        {stage === 1 && <Stage1Matching chars={sessionChars} onComplete={() => handleStageComplete(1)} />}
+        {stage === 2 && <Stage2Recognition chars={sessionChars} onComplete={() => handleStageComplete(2)} />}
+        {stage === 3 && <Stage3Listening chars={sessionChars} onComplete={() => handleStageComplete(3)} />}
+        {stage === 4 && <Stage4Input chars={sessionChars} onComplete={() => handleStageComplete(4)} />}
+      </div>
+      <div style={{ marginTop: 14, display: "flex", justifyContent: "center", gap: 8 }}>
+        {sessionChars.map(c => (
+          <div key={c.char} style={{
+            padding: "6px 10px", borderRadius: 10, textAlign: "center",
+            background: (charStages[c.char] || 0) >= 4 ? "#E8F5E9" : "white",
+            border: `2px solid ${(charStages[c.char] || 0) >= 4 ? "#4CAF50" : "#DDD"}`,
+            fontSize: 20, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
+          }}>{c.char}</div>
+        ))}
+      </div>
     </div>
   );
 }
