@@ -26,6 +26,87 @@ const HIRAGANA = [
   { char: "わ", rom: "wa" }, { char: "を", rom: "wo" }, { char: "ん", rom: "n" },
 ];
 
+// ============================================================
+// SPACED REPETITION SYSTEM
+// ============================================================
+const SRS_KEY = "hiragana_srs_v1";
+
+function loadSRSWeights() {
+  try { const s = localStorage.getItem(SRS_KEY); return s ? JSON.parse(s) : {}; }
+  catch { return {}; }
+}
+function saveSRSWeights(w) {
+  try { localStorage.setItem(SRS_KEY, JSON.stringify(w)); } catch {}
+}
+
+function useSRS() {
+  const weightsRef = useRef(loadSRSWeights());
+
+  const getWeight = (char) => weightsRef.current[char] ?? 1;
+
+  // pool: 출제할 글자 배열(난이도별 서브셋), exclude: 직전 글자 제외
+  const pickChar = useCallback((pool = HIRAGANA, exclude = null) => {
+    const filtered = pool.filter(h => h.char !== exclude);
+    const ws = filtered.map(h => getWeight(h.char));
+    const total = ws.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < filtered.length; i++) {
+      r -= ws[i];
+      if (r <= 0) return filtered[i];
+    }
+    return filtered[filtered.length - 1];
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const recordCorrect = useCallback((char) => {
+    const w = weightsRef.current;
+    w[char] = Math.max(0.25, (w[char] ?? 1) * 0.6);
+    saveSRSWeights(w);
+  }, []);
+
+  const recordWrong = useCallback((char) => {
+    const w = weightsRef.current;
+    w[char] = Math.min(8, (w[char] ?? 1) * 2.5);
+    saveSRSWeights(w);
+  }, []);
+
+  return { pickChar, recordCorrect, recordWrong };
+}
+
+// ============================================================
+// DIFFICULTY SYSTEM
+// ============================================================
+const DIFFICULTY_CONFIG = {
+  beginner: { label: "초급",   emoji: "🌱", color: "#4CAF50", charLimit: 15, speedMult: 0.65, entityCount: 4,
+              desc: "처음 15자 · 느린 속도" },
+  normal:   { label: "보통",   emoji: "🌟", color: "#2196F3", charLimit: 46, speedMult: 1.0,  entityCount: 6,
+              desc: "전체 글자 · 보통 속도" },
+  hard:     { label: "고급",   emoji: "🔥", color: "#F44336", charLimit: 46, speedMult: 1.6,  entityCount: 8,
+              desc: "전체 글자 · 빠른 속도" },
+  auto:     { label: "자동 AI", emoji: "🤖", color: "#9C27B0", charLimit: null, speedMult: null, entityCount: null,
+              desc: "실력에 맞게 자동 조절" },
+};
+
+// SRS 가중치로 실력 수준을 판단 → 자동 난이도 산출
+function computeAutoDifficulty() {
+  const weights = loadSRSWeights();
+  const total = HIRAGANA.reduce((s, h) => s + (weights[h.char] ?? 1), 0);
+  const avg = total / HIRAGANA.length;
+  if (avg > 2.0) return "beginner";
+  if (avg < 0.55) return "hard";
+  return "normal";
+}
+
+// "auto"면 실제 설정값을 계산해 반환
+function resolveConfig(difficulty) {
+  if (difficulty === "auto") return DIFFICULTY_CONFIG[computeAutoDifficulty()];
+  return DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.normal;
+}
+
+function getCharPool(difficulty) {
+  const limit = resolveConfig(difficulty).charLimit;
+  return limit ? HIRAGANA.slice(0, limit) : HIRAGANA;
+}
+
 const SHOP_ITEMS = [
   { id: 1, name: "별 스티커", emoji: "⭐", price: 10, type: "sticker" },
   { id: 2, name: "하트 스티커", emoji: "❤️", price: 10, type: "sticker" },
@@ -152,7 +233,21 @@ const USERS = [
 ];
 
 function getDefaultUserData() {
-  return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡", streak: 0 };
+  return { points: 0, candies: 0, completedChars: [], owned: [], currentRoom: "🏡", streak: 0,
+           difficulty: "auto", playHistory: [], charStages: {} };
+}
+
+function savePlayRecord(userId, game, correct, wrong) {
+  try {
+    const key = `hiragana_user_${userId}`;
+    const raw = localStorage.getItem(key);
+    const data = raw ? JSON.parse(raw) : getDefaultUserData();
+    const history = data.playHistory || [];
+    history.push({ date: new Date().toISOString().slice(0, 10), game, correct, wrong, ts: Date.now() });
+    if (history.length > 200) history.splice(0, history.length - 200);
+    data.playHistory = history;
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {}
 }
 
 function loadUserData(userId) {
@@ -235,21 +330,106 @@ function UserSelectScreen({ onSelect }) {
 }
 
 // ============================================================
+// DIFFICULTY SELECT SCREEN
+// ============================================================
+function DifficultySelectScreen({ userInfo, savedDifficulty, onSelect }) {
+  const [selected, setSelected] = useState(savedDifficulty || "auto");
+  const effectiveLabel = selected === "auto"
+    ? `현재 실력: ${DIFFICULTY_CONFIG[computeAutoDifficulty()].label}`
+    : null;
+
+  return (
+    <div style={{
+      minHeight: "100vh",
+      background: "linear-gradient(135deg, #FFF5E6 0%, #FFE4B5 50%, #FFDAB9 100%)",
+      fontFamily: "'Nunito', 'Nanum Gothic', sans-serif",
+      maxWidth: 430, margin: "0 auto",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      justifyContent: "center", padding: 24,
+    }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap');
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes bounce-in{0%{transform:scale(0);opacity:0}70%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+        *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}button{cursor:pointer;border:none;outline:none;}`}</style>
+
+      <div style={{ fontSize: 56, animation: "float 3s ease-in-out infinite" }}>{userInfo.emoji}</div>
+      <div style={{ fontSize: 22, fontWeight: 900, color: userInfo.color, margin: "8px 0 4px" }}>{userInfo.name}</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: "#888", marginBottom: 28 }}>난이도를 선택해주세요</div>
+
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 12 }}>
+        {Object.entries(DIFFICULTY_CONFIG).map(([key, cfg]) => (
+          <button key={key} onClick={() => setSelected(key)} style={{
+            background: selected === key ? cfg.color : "white",
+            border: `3px solid ${cfg.color}`,
+            borderRadius: 18, padding: "14px 20px",
+            display: "flex", alignItems: "center", gap: 16,
+            boxShadow: selected === key ? `0 4px 18px ${cfg.color}60` : "0 2px 8px rgba(0,0,0,0.08)",
+            transition: "all 0.2s",
+          }}>
+            <span style={{ fontSize: 32 }}>{cfg.emoji}</span>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontWeight: 900, fontSize: 17, color: selected === key ? "white" : cfg.color }}>{cfg.label}</div>
+              <div style={{ fontWeight: 700, fontSize: 12, color: selected === key ? "rgba(255,255,255,0.85)" : "#999" }}>{cfg.desc}</div>
+            </div>
+            {selected === key && <div style={{ marginLeft: "auto", color: "white", fontSize: 22 }}>✓</div>}
+          </button>
+        ))}
+      </div>
+
+      {effectiveLabel && (
+        <div style={{ marginTop: 14, fontSize: 13, fontWeight: 800, color: "#9C27B0",
+          background: "#F3E5F5", borderRadius: 12, padding: "6px 16px" }}>
+          🤖 {effectiveLabel}
+        </div>
+      )}
+
+      <button onClick={() => onSelect(selected)} style={{
+        marginTop: 28, width: "100%", padding: "16px 0",
+        background: "linear-gradient(90deg, #FF8C00, #FF6347)",
+        color: "white", borderRadius: 20, fontSize: 18, fontWeight: 900,
+        boxShadow: "0 6px 20px rgba(255,100,0,0.35)",
+      }}>시작하기 🚀</button>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN APP
 // ============================================================
 export default function HiraganaAdventure() {
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [difficulty, setDifficulty] = useState(null);
 
   const handleSelectUser = (userId) => setCurrentUserId(userId);
-  const handleSwitchUser = () => setCurrentUserId(null);
+  const handleSelectDifficulty = (diff) => {
+    // 선택한 난이도를 user data에 저장
+    const key = `hiragana_user_${currentUserId}`;
+    try {
+      const raw = localStorage.getItem(key);
+      const data = raw ? JSON.parse(raw) : getDefaultUserData();
+      data.difficulty = diff;
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch {}
+    setDifficulty(diff);
+  };
+  const handleSwitchUser = () => { setCurrentUserId(null); setDifficulty(null); };
 
   if (!currentUserId) return <UserSelectScreen onSelect={handleSelectUser} />;
-  return <UserApp userId={currentUserId} onSwitchUser={handleSwitchUser} />;
+  if (!difficulty) {
+    const userInfo = USERS.find(u => u.id === currentUserId);
+    const saved = loadUserData(currentUserId).difficulty || "auto";
+    return <DifficultySelectScreen userInfo={userInfo} savedDifficulty={saved} onSelect={handleSelectDifficulty} />;
+  }
+  return <UserApp userId={currentUserId} difficulty={difficulty} onSwitchUser={handleSwitchUser} />;
 }
 
-function UserApp({ userId, onSwitchUser }) {
+function UserApp({ userId, difficulty, onSwitchUser }) {
   const userData = loadUserData(userId);
   const userInfo = USERS.find(u => u.id === userId);
+  const diffCfg = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.normal;
+  const onRecord = useCallback((game, correct, wrong) => {
+    savePlayRecord(userId, game, correct, wrong);
+  }, [userId]);
 
   const [screen, setScreen] = useState("home"); // home | story | quiz | fishing | balloon | shop | parent | draw
   const [points, setPoints] = useState(userData.points);
@@ -268,11 +448,13 @@ function UserApp({ userId, onSwitchUser }) {
   const [wrongPin, setWrongPin] = useState(false);
   const [notification, setNotification] = useState(null);
   const [rewardMultiplier, setRewardMultiplier] = useState(() => loadParentSettings().rewardMultiplier);
+  const [charStages, setCharStages] = useState(userData.charStages || {});
+  const [funnelKey, setFunnelKey] = useState(0);
 
   // Save to localStorage whenever key data changes
   useEffect(() => {
-    saveUserData(userId, { points, candies, completedChars, owned, currentRoom, streak });
-  }, [userId, points, candies, completedChars, owned, currentRoom, streak]);
+    saveUserData(userId, { points, candies, completedChars, owned, currentRoom, streak, charStages });
+  }, [userId, points, candies, completedChars, owned, currentRoom, streak, charStages]);
 
   const triggerParticles = useCallback((x = 50, y = 50) => {
     setParticlePos({ x, y });
@@ -300,6 +482,7 @@ function UserApp({ userId, onSwitchUser }) {
   const showScreen = (s) => {
     setScreen(s);
     setFoxMessage(
+      s === "funnel" ? "4단계로 완벽 마스터해보자! 📚" :
       s === "story" ? "모험을 시작해볼까? 두근두근~" :
       s === "quiz"  ? "퀴즈 준비됐어? 할 수 있어!" :
       s === "fishing" ? "낚시로 히라가나 잡아보자! 🎣" :
@@ -364,8 +547,12 @@ function UserApp({ userId, onSwitchUser }) {
             <span>{userInfo.name}</span>
           </button>
         )}
-        <div style={{ color: "white", fontWeight: 900, fontSize: 16 }}>
+        <div style={{ color: "white", fontWeight: 900, fontSize: 15, display: "flex", alignItems: "center", gap: 6 }}>
           ひらがな冒険
+          <span style={{
+            background: "rgba(255,255,255,0.22)", borderRadius: 10,
+            padding: "2px 7px", fontSize: 11, fontWeight: 800,
+          }}>{diffCfg.emoji} {diffCfg.label}</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <div style={{
@@ -392,13 +579,14 @@ function UserApp({ userId, onSwitchUser }) {
 
 
       <div style={{ padding: 16 }}>
-        {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} />}
+        {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} charStages={charStages} />}
+        {screen === "funnel" && <LearningFunnelScreen key={funnelKey} reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} charStages={charStages} setCharStages={setCharStages} onHome={() => showScreen("home")} onNewSession={() => setFunnelKey(k => k + 1)} />}
         {screen === "story" && <StoryScreen reward={reward} completedChars={completedChars} setCompletedChars={setCompletedChars} foxMood={foxMood} setFoxMood={setFoxMood} setFoxMessage={setFoxMessage} triggerParticles={triggerParticles} />}
-        {screen === "quiz" && <QuizScreen reward={reward} triggerParticles={triggerParticles} setFoxMessage={setFoxMessage} setFoxMood={setFoxMood} />}
-        {screen === "fishing" && <FishingGame reward={reward} triggerParticles={triggerParticles} />}
-        {screen === "balloon" && <BalloonGame reward={reward} triggerParticles={triggerParticles} />}
+        {screen === "quiz" && <QuizScreen reward={reward} triggerParticles={triggerParticles} setFoxMessage={setFoxMessage} setFoxMood={setFoxMood} difficulty={difficulty} onRecord={onRecord} />}
+        {screen === "fishing" && <FishingGame reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
+        {screen === "balloon" && <BalloonGame reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
         {screen === "shop" && <ShopScreen points={points} setPoints={setPoints} owned={owned} setOwned={setOwned} setCurrentRoom={setCurrentRoom} />}
-        {screen === "draw" && <DrawScreen reward={reward} triggerParticles={triggerParticles} />}
+        {screen === "draw" && <DrawScreen reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
         {screen === "parent" && <ParentScreen parentUnlocked={parentUnlocked} setParentUnlocked={setParentUnlocked} parentPin={parentPin} setParentPin={setParentPin} wrongPin={wrongPin} setWrongPin={setWrongPin} completedChars={completedChars} points={points} candies={candies} setRewardMultiplier={setRewardMultiplier} />}
       </div>
 
@@ -418,10 +606,13 @@ function UserApp({ userId, onSwitchUser }) {
 // ============================================================
 // HOME SCREEN
 // ============================================================
-function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage, foxMood, setScreen }) {
+function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage, foxMood, setScreen, charStages }) {
   const progress = (completedChars.length / HIRAGANA.length) * 100;
+  const stageCounts = [0,0,0,0,0];
+  HIRAGANA.forEach(h => { stageCounts[charStages[h.char] || 0]++; });
 
   const menus = [
+    { id: "funnel",  icon: "📚", label: "단계별 학습",   color: "#FF6F00", bg: "#FFF8E1", highlight: true },
     { id: "story",   icon: "📖", label: "스토리 모험",   color: "#FF8C00", bg: "#FFF3E0" },
     { id: "quiz",    icon: "🎯", label: "퀴즈 도전",     color: "#E91E63", bg: "#FCE4EC" },
     { id: "fishing", icon: "🎣", label: "낚시 게임",     color: "#2196F3", bg: "#E3F2FD" },
@@ -464,6 +655,20 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
         </div>
       </div>
 
+      {/* FUNNEL PROGRESS */}
+      <div style={{ background: "white", borderRadius: 20, padding: "14px 16px", marginBottom: 14, border: "2px solid #FFE0B2", boxShadow: "0 2px 12px rgba(255,111,0,0.1)" }}>
+        <div style={{ fontWeight: 900, fontSize: 13, color: "#FF6F00", marginBottom: 10 }}>📚 단계별 학습 현황</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[{n:0,label:"미학습",color:"#E0E0E0"},{n:1,label:"매칭",color:"#FF8C00"},{n:2,label:"인식",color:"#2196F3"},{n:3,label:"듣기",color:"#9C27B0"},{n:4,label:"마스터",color:"#4CAF50"}].map(s => (
+            <div key={s.n} style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontWeight: 900, fontSize: 16, color: s.color }}>{stageCounts[s.n]}</div>
+              <div style={{ height: 6, background: s.color, borderRadius: 4, opacity: 0.7, marginTop: 2 }}/>
+              <div style={{ fontSize: 9, color: "#AAA", fontWeight: 700, marginTop: 3 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* MENU GRID */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
         {menus.map(m => (
@@ -473,16 +678,18 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
             borderRadius: 20, padding: "18px 12px",
             display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
             transition: "transform 0.15s, box-shadow 0.15s",
-            boxShadow: `0 4px 14px ${m.color}40`,
+            boxShadow: m.highlight ? `0 6px 20px ${m.color}60` : `0 4px 14px ${m.color}40`,
             animation: "slide-up 0.5s ease both",
+            gridColumn: m.highlight ? "1 / -1" : undefined,
           }}
           onMouseDown={e => e.currentTarget.style.transform = "scale(0.95)"}
           onMouseUp={e => e.currentTarget.style.transform = "scale(1)"}
           onTouchStart={e => e.currentTarget.style.transform = "scale(0.95)"}
           onTouchEnd={e => e.currentTarget.style.transform = "scale(1)"}
           >
-            <span style={{ fontSize: 36 }}>{m.icon}</span>
-            <span style={{ fontSize: 13, fontWeight: 900, color: m.color }}>{m.label}</span>
+            <span style={{ fontSize: m.highlight ? 42 : 36 }}>{m.icon}</span>
+            <span style={{ fontSize: m.highlight ? 15 : 13, fontWeight: 900, color: m.color }}>{m.label}</span>
+            {m.highlight && <span style={{ fontSize: 11, color: m.color, opacity: 0.7, fontWeight: 700 }}>매칭 → 인식 → 듣기 → 쓰기</span>}
           </button>
         ))}
       </div>
@@ -694,31 +901,38 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
 // ============================================================
 // QUIZ SCREEN
 // ============================================================
-function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
-  const [current, setCurrent] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, difficulty = "normal", onRecord }) {
+  const { pickChar, recordCorrect, recordWrong } = useSRS();
+  const charPool = getCharPool(difficulty);
+  const [current, setCurrent] = useState(() => pickChar(charPool));
   const [choices, setChoices] = useState([]);
   const [selected, setSelected] = useState(null);
   const [score, setScore] = useState(0);
   const [total, setTotal] = useState(0);
   const [shake, setShake] = useState(false);
   const processingRef = useRef(false);
+  const statsRef = useRef({ correct: 0, wrong: 0 });
+
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("quiz", statsRef.current.correct, statsRef.current.wrong); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const makeChoices = useCallback((correct) => {
-    const others = HIRAGANA.filter(h => h.char !== correct.char)
+    const others = charPool.filter(h => h.char !== correct.char)
       .sort(() => Math.random()-0.5).slice(0,3);
     return [correct, ...others].sort(() => Math.random()-0.5);
-  }, []);
+  }, [charPool]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setChoices(makeChoices(current));
   }, [current, makeChoices]);
 
-  const next = useCallback(() => {
-    const next = HIRAGANA[Math.floor(Math.random() * HIRAGANA.length)];
-    setCurrent(next);
-    setChoices(makeChoices(next));
+  const next = useCallback((exclude = null) => {
+    const n = pickChar(charPool, exclude);
+    setCurrent(n);
+    setChoices(makeChoices(n));
     setSelected(null);
-  }, [makeChoices]);
+  }, [pickChar, charPool, makeChoices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = (c) => {
     if (processingRef.current || selected) return;
@@ -726,10 +940,14 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
     setSelected(c);
     setTotal(t => t + 1);
     if (c.char === current.char) {
+      recordCorrect(current.char);
+      statsRef.current.correct++;
       setScore(s => s + 1);
       reward(10, PRAISE[Math.floor(Math.random()*PRAISE.length)] + " 정답!", "excited");
-      setTimeout(() => { processingRef.current = false; next(); }, 1000);
+      setTimeout(() => { processingRef.current = false; next(current.char); }, 1000);
     } else {
+      recordWrong(current.char);
+      statsRef.current.wrong++;
       setShake(true);
       setFoxMessage(`정답은 「${current.char}」= ${current.rom} 이야!`);
       setFoxMood("thinking");
@@ -797,18 +1015,34 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood }) {
 // ============================================================
 // FISHING GAME
 // ============================================================
-function FishingGame({ reward, triggerParticles }) {
-  const [fish, setFish] = useState(() => Array.from({length:6}, (_,i) => ({
-    id: i, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
-    x: Math.random()*70+5, y: Math.random()*40+30, speed: Math.random()*0.5+0.3,
+function FishingGame({ reward, triggerParticles, difficulty = "normal", onRecord }) {
+  const { pickChar, recordCorrect, recordWrong } = useSRS();
+  const charPool = getCharPool(difficulty);
+  const cfg = resolveConfig(difficulty);
+  const fishCount = cfg.entityCount;
+  const statsRef = useRef({ correct: 0, wrong: 0 });
+
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("fishing", statsRef.current.correct, statsRef.current.wrong); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const makeFish = (excludeId, targetChar) => ({
+    id: excludeId ?? Date.now(),
+    char: charPool[Math.floor(Math.random()*charPool.length)],
+    x: Math.random()*70+5, y: Math.random()*40+30,
+    speed: (Math.random()*0.5+0.3) * cfg.speedMult,
     dir: Math.random()>0.5?1:-1,
-  })));
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+  });
+
+  const [fish, setFish] = useState(() => Array.from({length: fishCount}, (_, i) => makeFish(i)));
+  const [target, setTarget] = useState(() => pickChar(charPool));
   const [caught, setCaught] = useState([]);
   const [miss, setMiss] = useState(0);
+  const [feedback, setFeedback] = useState(null);
   const animRef = useRef();
   const catchingRef = useRef(false);
   const targetRef = useRef(target);
+  const feedbackTimerRef = useRef();
 
   useEffect(() => { targetRef.current = target; }, [target]);
 
@@ -834,27 +1068,38 @@ function FishingGame({ reward, triggerParticles }) {
     return () => cancelAnimationFrame(animRef.current);
   }, []);
 
+  const showFeedback = (msg, correct) => {
+    clearTimeout(feedbackTimerRef.current);
+    setFeedback({ msg, correct });
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
+  };
+
   const catchFish = (f) => {
     if (catchingRef.current) return;
     if (f.char.char === target.char) {
       catchingRef.current = true;
+      recordCorrect(target.char);
+      statsRef.current.correct++;
       setCaught(prev => [...prev, f.char.char]);
-      const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
-      // 잡힌 자리에 새 target 물고기 배치 → 항상 화면에 target 존재
+      const newTarget = pickChar(charPool, target.char);
       setFish(prev => {
         const filtered = prev.filter(x => x.id !== f.id);
         return [...filtered, {
           id: Date.now(), char: newTarget,
           x: Math.random()*70+5, y: Math.random()*40+30,
-          speed: Math.random()*0.5+0.3, dir: Math.random()>0.5?1:-1,
+          speed: (Math.random()*0.5+0.3) * cfg.speedMult, dir: Math.random()>0.5?1:-1,
         }];
       });
       reward(20, `「${target.char}」 낚았어! 잘했어!`, "excited");
+      showFeedback(`${target.char} → ${target.rom} (정답!)`, true);
       setTarget(newTarget);
       setTimeout(() => { catchingRef.current = false; }, 400);
     } else {
+      recordWrong(target.char);
+      statsRef.current.wrong++;
       setMiss(m => m + 1);
       triggerParticles(f.x, f.y);
+      showFeedback(`「${f.char.char}」는 ${f.char.rom} 소리입니다`, false);
     }
   };
 
@@ -902,7 +1147,17 @@ function FishingGame({ reward, triggerParticles }) {
         ))}
       </div>
 
-      <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between" }}>
+      {feedback && (
+        <div style={{
+          marginTop: 10, padding: "8px 14px", borderRadius: 12, textAlign: "center",
+          fontWeight: 700, fontSize: 14,
+          background: feedback.correct ? "#E8F5E9" : "#FFF3E0",
+          color: feedback.correct ? "#2E7D32" : "#E65100",
+          border: `2px solid ${feedback.correct ? "#66BB6A" : "#FFA726"}`,
+        }}>{feedback.msg}</div>
+      )}
+
+      <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between" }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#2196F3" }}>✅ 잡은 것: {caught.length}마리</div>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#FF5252" }}>❌ 실수: {miss}번</div>
       </div>
@@ -913,19 +1168,31 @@ function FishingGame({ reward, triggerParticles }) {
 // ============================================================
 // BALLOON GAME
 // ============================================================
-function BalloonGame({ reward, triggerParticles }) {
-  const [balloons, setBalloons] = useState(() => Array.from({length:6}, (_,i) => ({
+function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord }) {
+  const { pickChar, recordCorrect, recordWrong } = useSRS();
+  const charPool = getCharPool(difficulty);
+  const cfg = resolveConfig(difficulty);
+  const balloonCount = cfg.entityCount;
+  const statsRef = useRef({ correct: 0, wrong: 0 });
+
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("balloon", statsRef.current.correct, statsRef.current.wrong); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [balloons, setBalloons] = useState(() => Array.from({length: balloonCount}, (_,i) => ({
     id: i,
-    char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)],
+    char: charPool[Math.floor(Math.random()*charPool.length)],
     x: Math.random()*80+5, y: 80 + Math.random()*10,
-    speed: Math.random()*0.3+0.15,
+    speed: (Math.random()*0.3+0.15) * cfg.speedMult,
     color: ["#FF69B4","#FF8C00","#4CAF50","#2196F3","#9C27B0","#FF5722"][i%6],
   })));
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+  const [target, setTarget] = useState(() => pickChar(charPool));
   const [score, setScore] = useState(0);
+  const [feedback, setFeedback] = useState(null);
   const animRef = useRef();
   const poppingRef = useRef(false);
   const targetRef = useRef(target);
+  const feedbackTimerRef = useRef();
 
   // targetRef를 항상 최신 target으로 동기화
   useEffect(() => { targetRef.current = target; }, [target]);
@@ -959,7 +1226,7 @@ function BalloonGame({ reward, triggerParticles }) {
             targetVisible = true;
             return { ...orig, y: 90, x: Math.random()*80+5, char: targetRef.current };
           }
-          return { ...orig, y: 90, x: Math.random()*80+5, char: HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)] };
+          return { ...orig, y: 90, x: Math.random()*80+5, char: charPool[Math.floor(Math.random()*charPool.length)] };
         });
       });
       animRef.current = requestAnimationFrame(move);
@@ -968,22 +1235,33 @@ function BalloonGame({ reward, triggerParticles }) {
     return () => cancelAnimationFrame(animRef.current);
   }, []);
 
+  const showFeedback = (msg, correct) => {
+    clearTimeout(feedbackTimerRef.current);
+    setFeedback({ msg, correct });
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
+  };
+
   const pop = (b, e) => {
     if (poppingRef.current) return;
     if (b.char.char === target.char) {
       poppingRef.current = true;
-      const newTarget = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)];
-      // 터진 자리에 새 target 글자 배치 → 항상 화면에 target 존재
+      recordCorrect(target.char);
+      statsRef.current.correct++;
+      const newTarget = pickChar(charPool, target.char);
       setBalloons(prev => prev.map(x => x.id === b.id
         ? { ...x, y: 90, x: Math.random()*80+5, char: newTarget }
         : x
       ));
       reward(15, "빵! 맞췄어! 🎉", "excited");
+      showFeedback(`${target.char} → ${target.rom} (정답!)`, true);
       setScore(s => s + 1);
       setTarget(newTarget);
       setTimeout(() => { poppingRef.current = false; }, 400);
     } else {
+      recordWrong(target.char);
+      statsRef.current.wrong++;
       triggerParticles(b.x, b.y);
+      showFeedback(`「${b.char.char}」는 ${b.char.rom} 소리입니다`, false);
     }
   };
 
@@ -1021,7 +1299,17 @@ function BalloonGame({ reward, triggerParticles }) {
         ))}
       </div>
 
-      <div style={{ marginTop: 10, textAlign: "center", fontSize: 14, fontWeight: 800, color: "#9C27B0" }}>
+      {feedback && (
+        <div style={{
+          marginTop: 10, padding: "8px 14px", borderRadius: 12, textAlign: "center",
+          fontWeight: 700, fontSize: 14,
+          background: feedback.correct ? "#E8F5E9" : "#FFF3E0",
+          color: feedback.correct ? "#2E7D32" : "#E65100",
+          border: `2px solid ${feedback.correct ? "#66BB6A" : "#FFA726"}`,
+        }}>{feedback.msg}</div>
+      )}
+
+      <div style={{ marginTop: 8, textAlign: "center", fontSize: 14, fontWeight: 800, color: "#9C27B0" }}>
         터트린 풍선: {score}개 🎈
       </div>
     </div>
@@ -1031,10 +1319,16 @@ function BalloonGame({ reward, triggerParticles }) {
 // ============================================================
 // DRAW SCREEN
 // ============================================================
-function DrawScreen({ reward, triggerParticles }) {
+function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord }) {
+  const { pickChar, recordCorrect } = useSRS();
+  const charPool = getCharPool(difficulty);
+  const practiceRef = useRef(0);
+  useEffect(() => {
+    return () => { if (onRecord) onRecord("draw", practiceRef.current, 0); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
-  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
+  const [target, setTarget] = useState(() => pickChar(charPool));
   const [done, setDone] = useState(false);
   const [hasDrawn, setHasDrawn] = useState(false);
   const lastPos = useRef(null);
@@ -1094,9 +1388,9 @@ function DrawScreen({ reward, triggerParticles }) {
   };
 
   const nextChar = () => {
-    let next;
-    do { next = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]; } while (next.char === target.char);
-    setTarget(next);
+    recordCorrect(target.char);
+    practiceRef.current++;
+    setTarget(pickChar(charPool, target.char));
     clear();
   };
 
@@ -1147,6 +1441,409 @@ function DrawScreen({ reward, triggerParticles }) {
           }}>다음 글자 ➡</button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================================
+// LEARNING FUNNEL
+// ============================================================
+function speak(text) {
+  try {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ja-JP"; u.rate = 0.8;
+    window.speechSynthesis.speak(u);
+  } catch {}
+}
+
+function FunnelStageBar({ stage }) {
+  const stages = [
+    { n: 1, icon: "🔗", label: "매칭" },
+    { n: 2, icon: "👁", label: "인식" },
+    { n: 3, icon: "👂", label: "듣기" },
+    { n: 4, icon: "✏️", label: "쓰기" },
+  ];
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 18 }}>
+      {stages.map((s, i) => (
+        <div key={s.n} style={{ display: "contents" }}>
+          <div style={{
+            flex: 1, padding: "8px 4px", borderRadius: 12, textAlign: "center",
+            background: stage > s.n ? "#4CAF50" : stage === s.n ? "linear-gradient(135deg,#FF8C00,#FF6347)" : "#E8E8E8",
+            color: stage >= s.n ? "white" : "#AAA", fontWeight: 900, fontSize: 11,
+            boxShadow: stage === s.n ? "0 3px 10px rgba(255,140,0,0.45)" : "none",
+          }}>
+            <div style={{ fontSize: 15, marginBottom: 2 }}>{stage > s.n ? "✓" : s.icon}</div>
+            <div>{s.label}</div>
+          </div>
+          {i < 3 && <div style={{ color: "#CCC", fontSize: 10, flexShrink: 0 }}>▶</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 단계 1: 매칭 — 히라가나 ↔ 로마자 짝 맞추기
+function Stage1Matching({ chars, onComplete }) {
+  const [romOrder] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [leftSel, setLeftSel] = useState(null);
+  const [rightSel, setRightSel] = useState(null);
+  const [matched, setMatched] = useState(new Set());
+  const [flash, setFlash] = useState(null);
+
+  const doMatch = (leftIdx, rightIdx) => {
+    if (chars[leftIdx].char === romOrder[rightIdx].char) {
+      const next = new Set(matched); next.add(chars[leftIdx].char);
+      setMatched(next); setFlash("ok");
+      setTimeout(() => {
+        setFlash(null); setLeftSel(null); setRightSel(null);
+        if (next.size === chars.length) setTimeout(onComplete, 500);
+      }, 500);
+    } else {
+      setLeftSel(leftIdx); setRightSel(rightIdx); setFlash("no");
+      setTimeout(() => { setFlash(null); setLeftSel(null); setRightSel(null); }, 700);
+    }
+  };
+
+  const handleLeft = (i) => {
+    if (matched.has(chars[i].char) || flash) return;
+    if (rightSel !== null) { doMatch(i, rightSel); return; }
+    setLeftSel(i); setRightSel(null);
+  };
+
+  const handleRight = (i) => {
+    if (matched.has(romOrder[i].char) || flash) return;
+    if (leftSel !== null) { doMatch(leftSel, i); return; }
+    setRightSel(i); setLeftSel(null);
+  };
+
+  const cardBase = (isMatched, isSel, side) => ({
+    width: "100%", padding: "12px 6px", marginBottom: 8, borderRadius: 14,
+    fontWeight: 900, textAlign: "center", cursor: isMatched ? "default" : "pointer",
+    fontSize: side === "left" ? 30 : 16,
+    fontFamily: side === "left" ? "'Noto Sans JP', sans-serif" : "sans-serif",
+    border: `3px solid ${isMatched ? "#4CAF50" : isSel ? (flash === "no" ? "#F44336" : "#FF8C00") : "#DDD"}`,
+    background: isMatched ? "#E8F5E9" : isSel ? (flash === "no" ? "#FFEBEE" : "#FFF8E1") : "white",
+    color: isMatched ? "#388E3C" : isSel ? (flash === "no" ? "#C62828" : "#E65100") : "#333",
+    opacity: isMatched ? 0.55 : 1, transition: "all 0.15s",
+  });
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 13, color: "#888", fontWeight: 700, marginBottom: 14 }}>
+        히라가나와 발음을 짝지어 보세요 ✅ {matched.size}/{chars.length}
+      </div>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          {chars.map((c, i) => (
+            <button key={c.char} onClick={() => handleLeft(i)} style={cardBase(matched.has(c.char), leftSel === i, "left")}>
+              {c.char}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", paddingTop: 20, color: "#CCC", fontSize: 22 }}>↔</div>
+        <div style={{ flex: 1 }}>
+          {romOrder.map((c, i) => (
+            <button key={c.rom+i} onClick={() => handleRight(i)} style={cardBase(matched.has(c.char), rightSel === i, "right")}>
+              {c.rom}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 단계 2: 인식 — 히라가나 보고 발음 선택
+function Stage2Recognition({ chars, onComplete }) {
+  const mkChoices = (c) => [c, ...chars.filter(h => h.char !== c.char).sort(() => Math.random()-0.5).slice(0,3)].sort(() => Math.random()-0.5);
+  const [queue] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [idx, setIdx] = useState(0);
+  const [choices, setChoices] = useState(() => mkChoices(chars[0]));
+  const [sel, setSel] = useState(null);
+  const idxRef = useRef(0);
+  useEffect(() => { idxRef.current = idx; }, [idx]);
+
+  const pick = (c) => {
+    if (sel) return;
+    setSel(c);
+    setTimeout(() => {
+      const cur = idxRef.current;
+      if (cur + 1 >= queue.length) { onComplete(); return; }
+      setChoices(mkChoices(queue[cur + 1]));
+      setIdx(cur + 1); setSel(null);
+    }, 900);
+  };
+
+  const cur = queue[idx];
+  const isOk = (c) => sel && c.char === cur.char;
+  const isNg = (c) => sel && sel.char === c.char && c.char !== cur.char;
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#AAA", fontWeight: 700, marginBottom: 8 }}>{idx+1} / {queue.length}</div>
+      <div style={{ textAlign: "center", marginBottom: 22 }}>
+        <div style={{ fontSize: 76, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, color: "#222", lineHeight: 1.1 }}>{cur.char}</div>
+        <div style={{ fontSize: 13, color: "#AAA", fontWeight: 700, marginTop: 4 }}>이 글자의 발음은?</div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {choices.map(c => (
+          <button key={c.char} onClick={() => pick(c)} style={{
+            padding: "16px 8px", borderRadius: 16, fontWeight: 900, fontSize: 20,
+            border: `3px solid ${isOk(c) ? "#4CAF50" : isNg(c) ? "#F44336" : "#DDD"}`,
+            background: isOk(c) ? "#E8F5E9" : isNg(c) ? "#FFEBEE" : "white",
+            color: isOk(c) ? "#2E7D32" : isNg(c) ? "#C62828" : "#333",
+          }}>{c.rom}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 단계 3: 듣기 — 소리 듣고 히라가나 선택
+function Stage3Listening({ chars, onComplete }) {
+  const mkChoices = (c) => [c, ...chars.filter(h => h.char !== c.char).sort(() => Math.random()-0.5).slice(0,3)].sort(() => Math.random()-0.5);
+  const [queue] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [idx, setIdx] = useState(0);
+  const [choices, setChoices] = useState(() => mkChoices(chars[0]));
+  const [sel, setSel] = useState(null);
+  const [playing, setPlaying] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const idxRef = useRef(0);
+  useEffect(() => { idxRef.current = idx; }, [idx]);
+  useEffect(() => { setShowHint(false); }, [idx]);
+
+  const hasTTS = typeof window !== "undefined" && !!window.speechSynthesis;
+  const cur = queue[idx];
+
+  const playSound = useCallback(() => {
+    if (!hasTTS) return;
+    setPlaying(true); speak(cur.char);
+    setTimeout(() => setPlaying(false), 1000);
+  }, [cur, hasTTS]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { setTimeout(playSound, 350); }, [idx]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pick = (c) => {
+    if (sel) return;
+    setSel(c);
+    setTimeout(() => {
+      const ci = idxRef.current;
+      if (ci + 1 >= queue.length) { onComplete(); return; }
+      setChoices(mkChoices(queue[ci + 1]));
+      setIdx(ci + 1); setSel(null);
+    }, 900);
+  };
+
+  const isOk = (c) => sel && c.char === cur.char;
+  const isNg = (c) => sel && sel.char === c.char && c.char !== cur.char;
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#AAA", fontWeight: 700, marginBottom: 8 }}>{idx+1} / {queue.length}</div>
+      <div style={{ textAlign: "center", marginBottom: 12 }}>
+        {hasTTS ? (
+          <>
+            <button onClick={playSound} style={{
+              fontSize: 52, padding: "16px 28px", borderRadius: 24,
+              background: playing ? "#FFF3E0" : "white",
+              border: `3px solid ${playing ? "#FF8C00" : "#DDD"}`,
+              boxShadow: playing ? "0 0 20px rgba(255,140,0,0.3)" : "0 2px 8px rgba(0,0,0,0.07)",
+              animation: playing ? "pulse 0.5s infinite" : "none",
+            }}>🔊</button>
+            <div style={{ fontSize: 12, color: "#AAA", fontWeight: 700, marginTop: 6 }}>탭하여 다시 듣기</div>
+          </>
+        ) : (
+          <div style={{ padding: "10px 16px", background: "#FFF8E1", border: "2px solid #FFD54F", borderRadius: 12, fontSize: 13, color: "#F57F17", fontWeight: 700 }}>
+            ⚠️ 이 기기는 음성을 지원하지 않습니다. 힌트를 사용하세요.
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <div style={{ fontSize: 13, color: "#888", fontWeight: 700 }}>
+          {hasTTS ? "소리에 맞는 히라가나를 선택하세요" : "발음에 맞는 히라가나를 선택하세요"}
+        </div>
+        <button onClick={() => setShowHint(h => !h)} style={{
+          fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 10,
+          background: showHint ? "#FFF3E0" : "#F5F5F5",
+          border: `2px solid ${showHint ? "#FF8C00" : "#DDD"}`,
+          color: showHint ? "#FF8C00" : "#999",
+        }}>💡 힌트</button>
+      </div>
+      {showHint && (
+        <div style={{ textAlign: "center", marginBottom: 10, fontSize: 18, fontWeight: 900, color: "#FF8C00",
+          background: "#FFF8E1", borderRadius: 12, padding: "8px", border: "2px solid #FFD54F" }}>
+          발음: <span style={{ fontSize: 22 }}>{cur.rom}</span>
+        </div>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {choices.map(c => (
+          <button key={c.char} onClick={() => pick(c)} style={{
+            padding: "16px 8px", borderRadius: 16, fontWeight: 900, fontSize: 34,
+            fontFamily: "'Noto Sans JP', sans-serif",
+            border: `3px solid ${isOk(c) ? "#4CAF50" : isNg(c) ? "#F44336" : "#DDD"}`,
+            background: isOk(c) ? "#E8F5E9" : isNg(c) ? "#FFEBEE" : "white",
+            color: isOk(c) ? "#2E7D32" : isNg(c) ? "#C62828" : "#333",
+          }}>{c.char}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// 단계 4: 쓰기 — 히라가나 보고 발음 입력
+function Stage4Input({ chars, onComplete }) {
+  const [queue] = useState(() => [...chars].sort(() => Math.random()-0.5));
+  const [idx, setIdx] = useState(0);
+  const [input, setInput] = useState("");
+  const [result, setResult] = useState(null);
+  const inputRef = useRef();
+
+  useEffect(() => {
+    setInput(""); setResult(null);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }, [idx]);
+
+  const cur = queue[idx];
+
+  const submit = () => {
+    if (result) return;
+    const ok = input.trim().toLowerCase() === cur.rom.toLowerCase();
+    setResult(ok ? "ok" : "ng");
+    if (ok) {
+      setTimeout(() => {
+        if (idx + 1 >= queue.length) onComplete();
+        else setIdx(i => i + 1);
+      }, 800);
+    } else {
+      setTimeout(() => { setResult(null); setInput(""); }, 1300);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#AAA", fontWeight: 700, marginBottom: 8 }}>{idx+1} / {queue.length}</div>
+      <div style={{ textAlign: "center", marginBottom: 22 }}>
+        <div style={{ fontSize: 76, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900, color: "#222", lineHeight: 1.1 }}>{cur.char}</div>
+        <div style={{ fontSize: 13, color: "#AAA", fontWeight: 700, marginTop: 4 }}>로마자로 입력하세요</div>
+      </div>
+      <div style={{
+        borderRadius: 16, border: `3px solid ${result === "ok" ? "#4CAF50" : result === "ng" ? "#F44336" : "#DDD"}`,
+        background: result === "ok" ? "#E8F5E9" : result === "ng" ? "#FFEBEE" : "white",
+        padding: "4px 16px", marginBottom: 10, transition: "all 0.2s",
+      }}>
+        <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          placeholder={`예: ${cur.rom}`}
+          style={{
+            width: "100%", border: "none", outline: "none",
+            fontSize: 26, fontWeight: 900, textAlign: "center", background: "transparent",
+            padding: "12px 0",
+            color: result === "ok" ? "#2E7D32" : result === "ng" ? "#C62828" : "#333",
+          }}
+        />
+      </div>
+      {result === "ng" && (
+        <div style={{ textAlign: "center", color: "#E65100", fontWeight: 800, fontSize: 13, marginBottom: 8 }}>
+          정답은 「{cur.rom}」 입니다
+        </div>
+      )}
+      <button onClick={submit} style={{
+        width: "100%", padding: "14px", borderRadius: 16, fontSize: 16, fontWeight: 900,
+        background: "linear-gradient(90deg, #FF8C00, #FF6347)", color: "white", border: "none",
+        boxShadow: "0 4px 14px rgba(255,140,0,0.35)",
+      }}>확인 ✓</button>
+    </div>
+  );
+}
+
+// 메인 학습 퍼널 화면
+function LearningFunnelScreen({ reward, triggerParticles, difficulty, onRecord, charStages, setCharStages, onHome, onNewSession }) {
+  const { pickChar, recordCorrect } = useSRS();
+  const charPool = getCharPool(difficulty);
+
+  const [sessionChars] = useState(() => {
+    const picked = [];
+    for (let i = 0; i < 5; i++) picked.push(pickChar(charPool, picked[picked.length-1]?.char));
+    return picked;
+  });
+  const [stage, setStage] = useState(1);
+  const [transitioning, setTransitioning] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleStageComplete = (n) => {
+    setTransitioning(true);
+    setCharStages(prev => {
+      const next = { ...prev };
+      sessionChars.forEach(c => { next[c.char] = Math.max(next[c.char] || 0, n); });
+      return next;
+    });
+    setTimeout(() => {
+      setTransitioning(false);
+      if (n < 4) setStage(n + 1);
+      else {
+        sessionChars.forEach(c => recordCorrect(c.char));
+        reward(60, "4단계 완료! 완벽 마스터! 🏆", "excited");
+        if (onRecord) onRecord("funnel", 5, 0);
+        setDone(true);
+      }
+    }, 1200);
+  };
+
+  if (done) return (
+    <div style={{ textAlign: "center", animation: "bounce-in 0.5s ease" }}>
+      <div style={{ fontSize: 64, marginBottom: 8 }}>🏆</div>
+      <div style={{ fontSize: 22, fontWeight: 900, color: "#FF8C00", marginBottom: 4 }}>4단계 완료!</div>
+      <div style={{ fontSize: 14, color: "#888", marginBottom: 20 }}>오늘 마스터한 글자</div>
+      <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 10, marginBottom: 28 }}>
+        {sessionChars.map(c => (
+          <div key={c.char} style={{ padding: "12px 16px", background: "#E8F5E9", border: "2px solid #4CAF50", borderRadius: 16, textAlign: "center" }}>
+            <div style={{ fontSize: 32, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900 }}>{c.char}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#2E7D32" }}>{c.rom}</div>
+          </div>
+        ))}
+      </div>
+      <button onClick={onNewSession} style={{
+        width: "100%", padding: "14px", borderRadius: 16, fontSize: 16, fontWeight: 900,
+        background: "linear-gradient(90deg, #FF8C00, #FF6347)", color: "white", border: "none",
+        boxShadow: "0 4px 14px rgba(255,140,0,0.35)", marginBottom: 10,
+      }}>새 세션 (다른 글자) 🔄</button>
+      <button onClick={onHome} style={{
+        width: "100%", padding: "14px", borderRadius: 16, fontSize: 15, fontWeight: 800,
+        background: "#EEE", color: "#666", border: "2px solid #CCC",
+      }}>홈으로</button>
+    </div>
+  );
+
+  if (transitioning) return (
+    <div style={{ textAlign: "center", padding: "70px 0", animation: "bounce-in 0.4s ease" }}>
+      <div style={{ fontSize: 60 }}>{["🔗","👁","👂","✏️"][stage-1]}</div>
+      <div style={{ fontSize: 20, fontWeight: 900, color: "#FF8C00", marginTop: 12 }}>{stage}단계 완료!</div>
+      <div style={{ fontSize: 13, color: "#888", marginTop: 6 }}>훌륭해요! 다음 단계로 이동 중...</div>
+    </div>
+  );
+
+  return (
+    <div>
+      <FunnelStageBar stage={stage} />
+      <div style={{ background: "white", borderRadius: 20, padding: 18, boxShadow: "0 4px 20px rgba(0,0,0,0.07)", border: "2px solid #F0F0F0" }}>
+        {stage === 1 && <Stage1Matching chars={sessionChars} onComplete={() => handleStageComplete(1)} />}
+        {stage === 2 && <Stage2Recognition chars={sessionChars} onComplete={() => handleStageComplete(2)} />}
+        {stage === 3 && <Stage3Listening chars={sessionChars} onComplete={() => handleStageComplete(3)} />}
+        {stage === 4 && <Stage4Input chars={sessionChars} onComplete={() => handleStageComplete(4)} />}
+      </div>
+      <div style={{ marginTop: 14, display: "flex", justifyContent: "center", gap: 8 }}>
+        {sessionChars.map(c => (
+          <div key={c.char} style={{
+            padding: "6px 10px", borderRadius: 10, textAlign: "center",
+            background: (charStages[c.char] || 0) >= 4 ? "#E8F5E9" : "white",
+            border: `2px solid ${(charStages[c.char] || 0) >= 4 ? "#4CAF50" : "#DDD"}`,
+            fontSize: 20, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
+          }}>{c.char}</div>
+        ))}
+      </div>
     </div>
   );
 }
