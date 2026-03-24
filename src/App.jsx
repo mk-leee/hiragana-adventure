@@ -502,7 +502,14 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
   const [lessonStep, setLessonStep] = useState(0); // 0:chapter list  1:learn  2:quiz  3:complete
   const [quizResult, setQuizResult] = useState(null); // null | "correct" | "wrong"
   const [wrongChoice, setWrongChoice] = useState(null);
-  const [unlockedChapters, setUnlockedChapters] = useState(() => CHAPTERS.map(ch => ch.unlocked));
+  const [unlockedChapters, setUnlockedChapters] = useState(() =>
+    CHAPTERS.map((ch, i) => {
+      if (i === 0) return true;
+      // 이전 챕터의 모든 글자를 완료했으면 언락
+      const prevChapter = CHAPTERS[i - 1];
+      return prevChapter.chars.every(c => completedChars.includes(c));
+    })
+  );
 
   const lessonChar = currentChapter ? currentChapter.chars[charIndex] : null;
 
