@@ -390,14 +390,6 @@ function UserApp({ userId, onSwitchUser }) {
         }}>{notification.text}</div>
       )}
 
-      {/* STREAK BADGE */}
-      {streak > 0 && (
-        <div style={{
-          background: "linear-gradient(135deg, #FF69B4, #FF1493)",
-          color: "white", textAlign: "center", padding: "4px",
-          fontSize: 12, fontWeight: 800, letterSpacing: 1,
-        }}>🔥 {streak}연속 정답! 대단해요!</div>
-      )}
 
       <div style={{ padding: 16 }}>
         {screen === "home" && <HomeScreen showScreen={showScreen} reward={reward} completedChars={completedChars} foxDancing={foxDancing} foxMessage={foxMessage} foxMood={foxMood} setScreen={setScreen} setParentUnlocked={setParentUnlocked} />}
