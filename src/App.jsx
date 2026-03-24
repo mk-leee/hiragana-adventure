@@ -166,6 +166,17 @@ function saveUserData(userId, data) {
   try { localStorage.setItem(`hiragana_user_${userId}`, JSON.stringify(data)); } catch {}
 }
 
+function loadParentSettings() {
+  try {
+    const saved = localStorage.getItem("hiragana_parent_settings");
+    return saved ? { difficulty: "normal", dailyLimit: 30, rewardMultiplier: 1, ...JSON.parse(saved) } : { difficulty: "normal", dailyLimit: 30, rewardMultiplier: 1 };
+  } catch { return { difficulty: "normal", dailyLimit: 30, rewardMultiplier: 1 }; }
+}
+
+function saveParentSettings(data) {
+  try { localStorage.setItem("hiragana_parent_settings", JSON.stringify(data)); } catch {}
+}
+
 // ============================================================
 // USER SELECT SCREEN
 // ============================================================
@@ -256,6 +267,7 @@ function UserApp({ userId, onSwitchUser }) {
   const [parentPin, setParentPin] = useState("");
   const [wrongPin, setWrongPin] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [rewardMultiplier, setRewardMultiplier] = useState(() => loadParentSettings().rewardMultiplier);
 
   // Save to localStorage whenever key data changes
   useEffect(() => {
@@ -269,7 +281,8 @@ function UserApp({ userId, onSwitchUser }) {
   }, []);
 
   const reward = useCallback((pts, msg, mood = "excited", x = 50, y = 50) => {
-    setPoints(p => p + pts);
+    const actualPts = Math.round(pts * rewardMultiplier);
+    setPoints(p => p + actualPts);
     setCandies(c => c + 1);
     setStreak(s => s + 1);
     setFoxMessage(msg);
@@ -280,9 +293,9 @@ function UserApp({ userId, onSwitchUser }) {
       setFoxMessage("5개 연속! 히라코 댄스!!🕺");
       setTimeout(() => setFoxDancing(false), 3000);
     }
-    setNotification({ text: `+${pts}포인트 🍬`, color: "#FFD700" });
+    setNotification({ text: `+${actualPts}포인트 🍬`, color: "#FFD700" });
     setTimeout(() => setNotification(null), 1500);
-  }, [streak, triggerParticles]);
+  }, [streak, triggerParticles, rewardMultiplier]);
 
   const showScreen = (s) => {
     setScreen(s);
@@ -394,7 +407,7 @@ function UserApp({ userId, onSwitchUser }) {
         {screen === "balloon" && <BalloonGame reward={reward} triggerParticles={triggerParticles} />}
         {screen === "shop" && <ShopScreen points={points} setPoints={setPoints} owned={owned} setOwned={setOwned} setCurrentRoom={setCurrentRoom} />}
         {screen === "draw" && <DrawScreen reward={reward} triggerParticles={triggerParticles} />}
-        {screen === "parent" && <ParentScreen parentUnlocked={parentUnlocked} setParentUnlocked={setParentUnlocked} parentPin={parentPin} setParentPin={setParentPin} wrongPin={wrongPin} setWrongPin={setWrongPin} />}
+        {screen === "parent" && <ParentScreen parentUnlocked={parentUnlocked} setParentUnlocked={setParentUnlocked} parentPin={parentPin} setParentPin={setParentPin} wrongPin={wrongPin} setWrongPin={setWrongPin} completedChars={completedChars} points={points} candies={candies} setRewardMultiplier={setRewardMultiplier} />}
       </div>
 
       {/* FOX ASSISTANT — always visible on home */}
@@ -502,6 +515,7 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
   const [lessonStep, setLessonStep] = useState(0); // 0:chapter list  1:learn  2:quiz  3:complete
   const [quizResult, setQuizResult] = useState(null); // null | "correct" | "wrong"
   const [wrongChoice, setWrongChoice] = useState(null);
+  const [quizChoices, setQuizChoices] = useState([]);
   const [unlockedChapters, setUnlockedChapters] = useState(() =>
     CHAPTERS.map((ch, i) => {
       if (i === 0) return true;
@@ -575,7 +589,11 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
           </div>
         </div>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <button onClick={() => setLessonStep(2)} style={{
+          <button onClick={() => {
+            const c = HIRAGANA.find(h => h.char === lessonChar);
+            setQuizChoices([c.rom, ...HIRAGANA.filter(h => h.char !== lessonChar).sort(() => Math.random()-0.5).slice(0,3).map(h => h.rom)].sort(() => Math.random()-0.5));
+            setLessonStep(2);
+          }} style={{
             background: "linear-gradient(135deg, #FF8C00, #FF6347)",
             color: "white", borderRadius: 20, padding: "14px 40px",
             fontSize: 16, fontWeight: 900,
@@ -589,8 +607,7 @@ function StoryScreen({ reward, completedChars, setCompletedChars, setFoxMood, se
 
   if (lessonChar && lessonStep === 2) {
     const char = HIRAGANA.find(h => h.char === lessonChar);
-    const choices = [char.rom, ...HIRAGANA.filter(h => h.char !== lessonChar).sort(() => Math.random()-0.5).slice(0,3).map(h => h.rom)]
-      .sort(() => Math.random()-0.5);
+    const choices = quizChoices;
     return (
       <div>
         <div style={{ textAlign: "center", marginBottom: 8 }}>
@@ -973,7 +990,7 @@ function BalloonGame({ reward, triggerParticles }) {
 function DrawScreen({ reward, triggerParticles }) {
   const canvasRef = useRef(null);
   const [drawing, setDrawing] = useState(false);
-  const [target] = useState(HIRAGANA[Math.floor(Math.random()*10)]);
+  const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [done, setDone] = useState(false);
   const lastPos = useRef(null);
 
@@ -1028,6 +1045,13 @@ function DrawScreen({ reward, triggerParticles }) {
     setDone(false);
   };
 
+  const nextChar = () => {
+    let next;
+    do { next = HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]; } while (next.char === target.char);
+    setTarget(next);
+    clear();
+  };
+
   return (
     <div>
       <div style={{ textAlign: "center", marginBottom: 12 }}>
@@ -1066,7 +1090,12 @@ function DrawScreen({ reward, triggerParticles }) {
       {done && (
         <div style={{ textAlign: "center", marginTop: 16, animation: "bounce-in 0.5s ease" }}>
           <div style={{ fontSize: 40 }}>🎉⭐🌟⭐🎉</div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: "#4CAF50" }}>훌륭해요! +20포인트!</div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: "#4CAF50", marginBottom: 10 }}>훌륭해요! +20포인트!</div>
+          <button onClick={nextChar} style={{
+            padding: "12px 28px", borderRadius: 14, fontSize: 15, fontWeight: 800,
+            background: "linear-gradient(135deg, #FF8C00, #FFB300)", color: "white",
+            border: "none", boxShadow: "0 4px 12px rgba(255,140,0,0.4)",
+          }}>다음 글자 ➡</button>
         </div>
       )}
     </div>
@@ -1152,11 +1181,17 @@ function ShopScreen({ points, setPoints, owned, setOwned, setCurrentRoom }) {
 // ============================================================
 // PARENT SCREEN
 // ============================================================
-function ParentScreen({ parentUnlocked, setParentUnlocked, parentPin, setParentPin, wrongPin, setWrongPin }) {
+function ParentScreen({ parentUnlocked, setParentUnlocked, parentPin, setParentPin, wrongPin, setWrongPin, completedChars, points, candies, setRewardMultiplier: setParentRewardMultiplier }) {
   const REAL_PIN = "1234";
-  const [difficulty, setDifficulty] = useState("normal");
-  const [dailyLimit, setDailyLimit] = useState(30);
-  const [rewardMultiplier, setRewardMultiplier] = useState(1);
+  const settings = loadParentSettings();
+  const [difficulty, setDifficulty] = useState(settings.difficulty);
+  const [dailyLimit, setDailyLimit] = useState(settings.dailyLimit);
+  const [rewardMultiplier, setRewardMultiplier] = useState(settings.rewardMultiplier);
+
+  useEffect(() => {
+    saveParentSettings({ difficulty, dailyLimit, rewardMultiplier });
+    setParentRewardMultiplier(rewardMultiplier);
+  }, [difficulty, dailyLimit, rewardMultiplier, setParentRewardMultiplier]);
 
   if (!parentUnlocked) {
     return (
@@ -1253,19 +1288,27 @@ function ParentScreen({ parentUnlocked, setParentUnlocked, parentPin, setParentP
       </div>
 
       <div style={{ background: "#FFF9E6", borderRadius: 16, padding: 14, border: "2px solid #FFD700" }}>
-        <div style={{ fontSize: 14, fontWeight: 800, color: "#FF8C00", marginBottom: 8 }}>📊 이번 주 학습 현황</div>
-        {["월","화","수","목","금","토","일"].map((d, i) => (
-          <div key={d} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{ fontSize: 12, width: 20, color: "#888" }}>{d}</span>
-            <div style={{ flex: 1, height: 10, background: "#EEE", borderRadius: 5, overflow: "hidden" }}>
-              <div style={{
-                width: `${[80,45,90,30,0,0,0][i]}%`, height: "100%",
-                background: "linear-gradient(90deg, #FF8C00, #FF6347)", borderRadius: 5,
-              }}/>
+        <div style={{ fontSize: 14, fontWeight: 800, color: "#FF8C00", marginBottom: 12 }}>📊 학습 현황</div>
+        {[
+          { label: "배운 히라가나", value: `${completedChars ? completedChars.length : 0} / ${HIRAGANA.length}`, bar: completedChars ? completedChars.length / HIRAGANA.length : 0, unit: "글자" },
+          { label: "획득 포인트", value: `${points || 0}`, bar: Math.min((points || 0) / 500, 1), unit: "점" },
+          { label: "획득 사탕", value: `${candies || 0}`, bar: Math.min((candies || 0) / 100, 1), unit: "개" },
+        ].map(stat => (
+          <div key={stat.label} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700, color: "#666", marginBottom: 4 }}>
+              <span>{stat.label}</span>
+              <span style={{ color: "#FF8C00" }}>{stat.value}{stat.unit}</span>
             </div>
-            <span style={{ fontSize: 10, color: "#888", width: 35 }}>{[24,14,27,9,0,0,0][i]}분</span>
+            <div style={{ height: 10, background: "#EEE", borderRadius: 5, overflow: "hidden" }}>
+              <div style={{ width: `${Math.round(stat.bar * 100)}%`, height: "100%", background: "linear-gradient(90deg, #FF8C00, #FF6347)", borderRadius: 5, transition: "width 0.8s ease" }} />
+            </div>
           </div>
         ))}
+        <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
+          {completedChars && completedChars.map(c => (
+            <span key={c} style={{ background: "#FFD700", color: "#333", borderRadius: 6, padding: "2px 6px", fontSize: 14, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900 }}>{c}</span>
+          ))}
+        </div>
       </div>
 
       <button onClick={() => setParentUnlocked(false)} style={{
