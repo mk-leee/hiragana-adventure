@@ -992,6 +992,7 @@ function DrawScreen({ reward, triggerParticles }) {
   const [drawing, setDrawing] = useState(false);
   const [target, setTarget] = useState(() => HIRAGANA[Math.floor(Math.random()*HIRAGANA.length)]);
   const [done, setDone] = useState(false);
+  const [hasDrawn, setHasDrawn] = useState(false);
   const lastPos = useRef(null);
 
   const getPos = (e, canvas) => {
@@ -1025,6 +1026,7 @@ function DrawScreen({ reward, triggerParticles }) {
     ctx.lineJoin = "round";
     ctx.stroke();
     lastPos.current = pos;
+    if (!hasDrawn) setHasDrawn(true);
   };
 
   const endDraw = (e) => {
@@ -1033,6 +1035,7 @@ function DrawScreen({ reward, triggerParticles }) {
   };
 
   const check = () => {
+    if (!hasDrawn || done) return;
     setDone(true);
     reward(20, `잘 썼어! 「${target.char}」 완벽해!`, "excited");
     triggerParticles(50, 30);
@@ -1043,6 +1046,7 @@ function DrawScreen({ reward, triggerParticles }) {
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setDone(false);
+    setHasDrawn(false);
   };
 
   const nextChar = () => {
@@ -1080,11 +1084,12 @@ function DrawScreen({ reward, triggerParticles }) {
           flex: 1, padding: "12px", borderRadius: 14, fontSize: 14, fontWeight: 800,
           background: "#EEE", color: "#666", border: "2px solid #CCC",
         }}>🗑 지우기</button>
-        <button onClick={check} style={{
+        <button onClick={check} disabled={!hasDrawn || done} style={{
           flex: 2, padding: "12px", borderRadius: 14, fontSize: 14, fontWeight: 800,
-          background: "linear-gradient(135deg, #4CAF50, #8BC34A)", color: "white",
-          border: "none", boxShadow: "0 4px 12px rgba(76,175,80,0.4)",
-          animation: "pulse 2s infinite",
+          background: (!hasDrawn || done) ? "#CCC" : "linear-gradient(135deg, #4CAF50, #8BC34A)",
+          color: (!hasDrawn || done) ? "#999" : "white",
+          border: "none", boxShadow: (!hasDrawn || done) ? "none" : "0 4px 12px rgba(76,175,80,0.4)",
+          animation: (!hasDrawn || done) ? "none" : "pulse 2s infinite",
         }}>✅ 완료! 별 받기 ⭐</button>
       </div>
       {done && (
