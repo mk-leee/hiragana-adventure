@@ -866,7 +866,6 @@ function FishingGame({ reward, triggerParticles }) {
           fontSize: 60, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
           color: "#2196F3", animation: "float 2s ease-in-out infinite",
         }}>{target.char}</div>
-        <div style={{ fontSize: 13, color: "#888" }}>= {target.rom}</div>
       </div>
 
       <div style={{
@@ -996,7 +995,6 @@ function BalloonGame({ reward, triggerParticles }) {
           fontSize: 56, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
           color: "#9C27B0", animation: "float 1.5s ease-in-out infinite",
         }}>{target.char}</div>
-        <div style={{ fontSize: 13, color: "#888" }}>= {target.rom}</div>
       </div>
 
       <div style={{
@@ -1016,9 +1014,9 @@ function BalloonGame({ reward, triggerParticles }) {
             <span style={{ display: "block", lineHeight: 1 }}>🎈</span>
             <span style={{
               position: "absolute", top: 4, left: "50%", transform: "translateX(-50%)",
-              fontSize: 15, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
+              fontSize: 13, fontFamily: "sans-serif", fontWeight: 900,
               color: b.color, textShadow: "0 1px 3px white",
-            }}>{b.char.char}</span>
+            }}>{b.char.rom}</span>
           </button>
         ))}
       </div>
