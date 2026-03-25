@@ -1069,7 +1069,17 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
                   fontFamily: "'Noto Sans JP', sans-serif",
                   fontSize: isChildMode ? 16 : 14, fontWeight: 700,
                   color: "#555",
-                }}>{w.word}</span>
+                }}>
+                  {/* 정답 전: 해당 글자를 ＿로 마스킹 / 정답 후 또는 어린이모드: 그대로 표시 */}
+                  {(selected || isChildMode)
+                    ? w.word
+                    : w.word.split("").map((ch, ci) =>
+                        ch === current.char
+                          ? <span key={ci} style={{ color: "#CCC", letterSpacing: 1 }}>＿</span>
+                          : ch
+                      )
+                  }
+                </span>
                 {/* 어린이 모드: 뜻 바로 표시 / 일반: 정답 후 fade-in */}
                 {(isChildMode || selected) && (
                   <span style={{
