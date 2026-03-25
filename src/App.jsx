@@ -1014,8 +1014,14 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
       setShake(true);
       setFoxMessage(`정답은 「${current.char}」= ${current.rom} 이야!`);
       setFoxMood("thinking");
-      setTimeout(() => { processingRef.current = false; setShake(false); next(); }, 1500);
+      setTimeout(() => setShake(false), 400);
+      // processingRef는 유지 — 해설 탭 시 해제
     }
+  };
+
+  const dismissWrong = () => {
+    processingRef.current = false;
+    next();
   };
 
   return (
@@ -1067,12 +1073,19 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
         })}
       </div>
       {selected && selected.char !== current.char && (
-        <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 12, background: "#FFF3E0", border: "2px solid #FFA726", textAlign: "center" }}>
+        <button onClick={dismissWrong} style={{
+          marginTop: 12, padding: "12px 14px", borderRadius: 12,
+          background: "#FFF3E0", border: "2px solid #FFA726", textAlign: "center",
+          width: "100%", cursor: "pointer",
+        }}>
           <div style={{ fontSize: 12, color: "#999", fontWeight: 700, marginBottom: 2 }}>오답 해설</div>
           <div style={{ fontSize: 14, color: "#E65100", fontWeight: 900 }}>
             「{current.rom}」는 <span style={{ fontSize: 26, fontFamily: "'Noto Sans JP', sans-serif" }}>{current.char}</span> 입니다
           </div>
-        </div>
+          <div style={{ fontSize: 12, color: "#FFA726", fontWeight: 800, marginTop: 8 }}>
+            탭하여 다음 문제로 →
+          </div>
+        </button>
       )}
       {selected && selected.char === current.char && (
         <div style={{ marginTop: 16, textAlign: "center" }}>
