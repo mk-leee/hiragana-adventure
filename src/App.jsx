@@ -228,10 +228,10 @@ function CandyBurst({ count }) {
 // USER PROFILES
 // ============================================================
 const USERS = [
-  { id: "mankyu",  name: "만규", emoji: "🐻", color: "#FF8C00", bg: "#FFF3E0" },
+  { id: "mankyu",  name: "만규", emoji: "🐸", color: "#FF8C00", bg: "#FFF3E0" },
   { id: "hyeonhui", name: "현희", emoji: "🐱", color: "#E91E63", bg: "#FCE4EC" },
   { id: "hayun",  name: "하윤", emoji: "🐰", color: "#9C27B0", bg: "#F3E5F5" },
-  { id: "harin",  name: "하린", emoji: "🐸", color: "#2196F3", bg: "#E3F2FD" },
+  { id: "harin",  name: "하린", emoji: "🐻", color: "#2196F3", bg: "#E3F2FD" },
 ];
 
 function getDefaultUserData() {
