@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import pkg from "../package.json";
+import hiraganaWords from "./data/hiraganaWords";
 const version = pkg.version;
 
 // ============================================================
@@ -531,6 +532,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
         @keyframes slide-up { from{transform:translateY(60px);opacity:0} to{transform:translateY(0);opacity:1} }
         @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
         @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+        @keyframes fadein { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
         @keyframes glow { 0%,100%{box-shadow:0 0 12px #FFD700} 50%{box-shadow:0 0 28px #FFD700,0 0 48px #FF8C00} }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         button { cursor: pointer; border: none; outline: none; }
@@ -974,6 +976,7 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
   const [shake, setShake] = useState(false);
   const processingRef = useRef(false);
   const statsRef = useRef({ correct: 0, wrong: 0 });
+  const isChildMode = difficulty === "beginner";
 
   useEffect(() => {
     const stats = statsRef.current;
@@ -1047,6 +1050,37 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
           display: "inline-block", boxShadow: "0 4px 20px rgba(255,140,0,0.2)",
           border: "3px solid #FFD700",
         }}>「 {current.rom} 」</div>
+
+        {/* 단어 힌트 */}
+        {hiraganaWords[current.char] && (
+          <div style={{
+            display: "flex", justifyContent: "center", gap: 16,
+            marginTop: 10, flexWrap: "nowrap",
+          }}>
+            {hiraganaWords[current.char].slice(0, 2).map((w, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "center", gap: 4,
+                background: "rgba(255,255,255,0.7)",
+                borderRadius: 12, padding: "4px 10px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              }}>
+                <span style={{ fontSize: isChildMode ? 22 : 18 }}>{w.emoji}</span>
+                <span style={{
+                  fontFamily: "'Noto Sans JP', sans-serif",
+                  fontSize: isChildMode ? 16 : 14, fontWeight: 700,
+                  color: "#555",
+                }}>{w.word}</span>
+                {/* 어린이 모드: 뜻 바로 표시 / 일반: 정답 후 fade-in */}
+                {(isChildMode || selected) && (
+                  <span style={{
+                    fontSize: 12, fontWeight: 700, color: "#FF8C00",
+                    animation: !isChildMode ? "fadein 0.4s ease" : "none",
+                  }}>{w.meaning}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {choices.map(c => {
