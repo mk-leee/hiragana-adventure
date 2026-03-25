@@ -1059,7 +1059,7 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
           }
           return (
             <button key={c.char} onClick={() => pick(c)} style={{
-              padding: "22px 8px",
+              padding: selected ? "14px 8px 10px" : "22px 8px",
               borderRadius: 20,
               fontSize: 44,
               fontFamily: "'Noto Sans JP', sans-serif",
@@ -1068,7 +1068,16 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
               boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
               transition: "all 0.2s",
               lineHeight: 1,
-            }}>{c.char}</button>
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+            }}>
+              <span>{c.char}</span>
+              {selected && (
+                <span style={{
+                  fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 800,
+                  opacity: 0.85, letterSpacing: 0.5,
+                }}>{c.rom}</span>
+              )}
+            </button>
           );
         })}
       </div>
