@@ -7,24 +7,24 @@ const version = pkg.version;
 // DATA
 // ============================================================
 const HIRAGANA = [
-  { char: "あ", rom: "a", stroke: "あ" }, { char: "い", rom: "i" }, { char: "う", rom: "u" },
-  { char: "え", rom: "e" }, { char: "お", rom: "o" },
-  { char: "か", rom: "ka" }, { char: "き", rom: "ki" }, { char: "く", rom: "ku" },
-  { char: "け", rom: "ke" }, { char: "こ", rom: "ko" },
-  { char: "さ", rom: "sa" }, { char: "し", rom: "shi" }, { char: "す", rom: "su" },
-  { char: "せ", rom: "se" }, { char: "そ", rom: "so" },
-  { char: "た", rom: "ta" }, { char: "ち", rom: "chi" }, { char: "つ", rom: "tsu" },
-  { char: "て", rom: "te" }, { char: "と", rom: "to" },
-  { char: "な", rom: "na" }, { char: "に", rom: "ni" }, { char: "ぬ", rom: "nu" },
-  { char: "ね", rom: "ne" }, { char: "の", rom: "no" },
-  { char: "は", rom: "ha" }, { char: "ひ", rom: "hi" }, { char: "ふ", rom: "fu" },
-  { char: "へ", rom: "he" }, { char: "ほ", rom: "ho" },
-  { char: "ま", rom: "ma" }, { char: "み", rom: "mi" }, { char: "む", rom: "mu" },
-  { char: "め", rom: "me" }, { char: "も", rom: "mo" },
-  { char: "や", rom: "ya" }, { char: "ゆ", rom: "yu" }, { char: "よ", rom: "yo" },
-  { char: "ら", rom: "ra" }, { char: "り", rom: "ri" }, { char: "る", rom: "ru" },
-  { char: "れ", rom: "re" }, { char: "ろ", rom: "ro" },
-  { char: "わ", rom: "wa" }, { char: "を", rom: "wo" }, { char: "ん", rom: "n" },
+  { char: "あ", rom: "a",   strokes: 3 }, { char: "い", rom: "i",   strokes: 2 }, { char: "う", rom: "u",   strokes: 2 },
+  { char: "え", rom: "e",   strokes: 2 }, { char: "お", rom: "o",   strokes: 3 },
+  { char: "か", rom: "ka",  strokes: 3 }, { char: "き", rom: "ki",  strokes: 4 }, { char: "く", rom: "ku",  strokes: 1 },
+  { char: "け", rom: "ke",  strokes: 3 }, { char: "こ", rom: "ko",  strokes: 2 },
+  { char: "さ", rom: "sa",  strokes: 3 }, { char: "し", rom: "shi", strokes: 1 }, { char: "す", rom: "su",  strokes: 2 },
+  { char: "せ", rom: "se",  strokes: 3 }, { char: "そ", rom: "so",  strokes: 2 },
+  { char: "た", rom: "ta",  strokes: 4 }, { char: "ち", rom: "chi", strokes: 2 }, { char: "つ", rom: "tsu", strokes: 1 },
+  { char: "て", rom: "te",  strokes: 1 }, { char: "と", rom: "to",  strokes: 2 },
+  { char: "な", rom: "na",  strokes: 4 }, { char: "に", rom: "ni",  strokes: 3 }, { char: "ぬ", rom: "nu",  strokes: 2 },
+  { char: "ね", rom: "ne",  strokes: 2 }, { char: "の", rom: "no",  strokes: 1 },
+  { char: "は", rom: "ha",  strokes: 3 }, { char: "ひ", rom: "hi",  strokes: 2 }, { char: "ふ", rom: "fu",  strokes: 3 },
+  { char: "へ", rom: "he",  strokes: 1 }, { char: "ほ", rom: "ho",  strokes: 4 },
+  { char: "ま", rom: "ma",  strokes: 3 }, { char: "み", rom: "mi",  strokes: 2 }, { char: "む", rom: "mu",  strokes: 3 },
+  { char: "め", rom: "me",  strokes: 2 }, { char: "も", rom: "mo",  strokes: 3 },
+  { char: "や", rom: "ya",  strokes: 3 }, { char: "ゆ", rom: "yu",  strokes: 2 }, { char: "よ", rom: "yo",  strokes: 2 },
+  { char: "ら", rom: "ra",  strokes: 2 }, { char: "り", rom: "ri",  strokes: 2 }, { char: "る", rom: "ru",  strokes: 1 },
+  { char: "れ", rom: "re",  strokes: 2 }, { char: "ろ", rom: "ro",  strokes: 1 },
+  { char: "わ", rom: "wa",  strokes: 2 }, { char: "を", rom: "wo",  strokes: 3 }, { char: "ん", rom: "n",   strokes: 1 },
 ];
 
 // ============================================================
@@ -1563,7 +1563,15 @@ function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord 
           fontSize: 80, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
           color: "#4CAF50", opacity: 0.25, lineHeight: 1,
         }}>{target.char}</div>
-        <div style={{ fontSize: 14, fontWeight: 800, color: "#4CAF50", marginTop: -4 }}>「{target.rom}」</div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: -4 }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: "#4CAF50" }}>「{target.rom}」</span>
+          {target.strokes && (
+            <span style={{
+              fontSize: 12, fontWeight: 800, color: "white",
+              background: "#4CAF50", borderRadius: 10, padding: "2px 8px",
+            }}>{target.strokes}획</span>
+          )}
+        </div>
       </div>
       <div style={{ position: "relative", borderRadius: 20, overflow: "hidden", border: "4px solid #4CAF50" }}>
         <div style={{
