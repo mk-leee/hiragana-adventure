@@ -123,12 +123,15 @@ const SHOP_ITEMS = [
 ];
 
 const CHAPTERS = [
-  { week: 1, title: "히라코를 만나다", chars: ["あ","い","う","え","お"], unlocked: true },
-  { week: 2, title: "도쿄 출발!", chars: ["か","き","く","け","こ"], unlocked: false },
-  { week: 3, title: "후지산 등반", chars: ["さ","し","す","せ","そ"], unlocked: false },
-  { week: 4, title: "온천 마을", chars: ["た","ち","つ","て","と"], unlocked: false },
-  { week: 5, title: "교토의 비밀", chars: ["な","に","ぬ","ね","の"], unlocked: false },
-  { week: 6, title: "오사카 축제", chars: ["は","ひ","ふ","へ","ほ"], unlocked: false },
+  { week: 1, title: "히라코를 만나다",  chars: ["あ","い","う","え","お"], unlocked: true },
+  { week: 2, title: "도쿄 출발!",        chars: ["か","き","く","け","こ"], unlocked: false },
+  { week: 3, title: "후지산 등반",       chars: ["さ","し","す","せ","そ"], unlocked: false },
+  { week: 4, title: "온천 마을",         chars: ["た","ち","つ","て","と"], unlocked: false },
+  { week: 5, title: "교토의 비밀",       chars: ["な","に","ぬ","ね","の"], unlocked: false },
+  { week: 6, title: "오사카 축제",       chars: ["は","ひ","ふ","へ","ほ"], unlocked: false },
+  { week: 7, title: "삿포로의 겨울",    chars: ["ま","み","む","め","も"], unlocked: false },
+  { week: 8, title: "별이 빛나는 밤",   chars: ["や","ゆ","よ","ら","り"], unlocked: false },
+  { week: 9, title: "히라코와 작별",    chars: ["る","れ","ろ","わ","を","ん"], unlocked: false },
 ];
 
 const PRAISE = ["すごい！", "やった！", "いいね！", "完璧！", "天才！"];
