@@ -1392,10 +1392,23 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
       recordCorrect(target.char);
       statsRef.current.correct++;
       const newTarget = pickChar(charPool, target.char);
-      setBalloons(prev => prev.map(x => x.id === b.id
-        ? { ...x, y: 95, x: 10 + b.lane * laneWidth + laneWidth * 0.5 + (Math.random() - 0.5) * laneWidth * 0.4, char: newTarget }
-        : x
-      ));
+      setBalloons(prev => {
+        // 터진 풍선(b.id) 외의 풍선 중 랜덤으로 새 정답 담당을 지정
+        const others = prev.filter(x => x.id !== b.id);
+        const carrierId = others[Math.floor(Math.random() * others.length)].id;
+        return prev.map(x => {
+          const newX = 10 + x.lane * laneWidth + laneWidth * 0.5 + (Math.random() - 0.5) * laneWidth * 0.4;
+          if (x.id === b.id) {
+            // 터진 풍선: 랜덤 글자로 바닥에서 재등장
+            return { ...x, y: 95, x: newX, char: charPool[Math.floor(Math.random()*charPool.length)] };
+          }
+          if (x.id === carrierId) {
+            // 무작위 다른 풍선: 새 정답 글자로 바닥에서 재등장
+            return { ...x, y: 95, x: newX, char: newTarget };
+          }
+          return x;
+        });
+      });
       reward(15, "빵! 맞췄어! 🎉", "excited");
       showFeedback(`${target.char} → ${target.rom} (정답!)`, true);
       setScore(s => s + 1);
