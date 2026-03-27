@@ -1276,7 +1276,7 @@ function FishingGame({ reward, triggerParticles, difficulty = "normal", onRecord
             </span>
             <span style={{
               position: "absolute", top: -18, left: "50%",
-              transform: "translateX(-50%) scaleX(-1)",
+              transform: `translateX(-50%) scaleX(${f.dir})`,
               fontSize: 14, fontFamily: "sans-serif", fontWeight: 900,
               color: "white", textShadow: "0 1px 4px rgba(0,0,0,0.8)",
               whiteSpace: "nowrap",
