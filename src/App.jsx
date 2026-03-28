@@ -587,7 +587,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
       {/* NOTIFICATION TOAST */}
       {notification && (
         <div style={{
-          position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)",
+          position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)",
           background: notification.color, color: "#333",
           borderRadius: 20, padding: "8px 20px", fontSize: 16, fontWeight: 900,
           zIndex: 9998, animation: "bounce-in 0.4s ease",
@@ -662,7 +662,6 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
 // HOME SCREEN
 // ============================================================
 function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage, foxMood, setScreen, charStages }) {
-  const progress = (completedChars.length / HIRAGANA.length) * 100;
   const stageCounts = [0,0,0,0,0];
   HIRAGANA.forEach(h => { stageCounts[charStages[h.char] || 0]++; });
 
@@ -678,38 +677,6 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
 
   return (
     <div>
-      {/* PROGRESS BAR */}
-      <div style={{
-        background: "white", borderRadius: 20, padding: 16, marginBottom: 16,
-        boxShadow: "0 4px 20px rgba(255,140,0,0.15)",
-        border: "3px solid #FFD700",
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <span style={{ fontWeight: 900, fontSize: 14, color: "#FF8C00" }}>📚 히라가나 마스터 진도</span>
-          <span style={{ fontWeight: 900, fontSize: 14, color: "#FF8C00" }}>{completedChars.length}/{HIRAGANA.length}</span>
-        </div>
-        <div style={{ background: "#FFF0CC", borderRadius: 10, height: 18, overflow: "hidden", border: "2px solid #FFD700" }}>
-          <div style={{
-            width: `${progress}%`, height: "100%",
-            background: "linear-gradient(90deg, #FFD700, #FF8C00)",
-            borderRadius: 10, transition: "width 0.8s ease",
-            display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 4,
-          }}>
-            {progress > 15 && <span style={{ fontSize: 10, fontWeight: 900, color: "white" }}>{Math.round(progress)}%</span>}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-          {completedChars.map(c => (
-            <span key={c} style={{
-              background: "linear-gradient(135deg, #FFD700, #FF8C00)",
-              color: "white", borderRadius: 8, padding: "2px 8px",
-              fontSize: 16, fontWeight: 900, animation: "wiggle 2s infinite",
-              fontFamily: "'Noto Sans JP', sans-serif",
-            }}>{c}</span>
-          ))}
-        </div>
-      </div>
-
       {/* FUNNEL PROGRESS */}
       <div style={{ background: "white", borderRadius: 20, padding: "14px 16px", marginBottom: 14, border: "2px solid #FFE0B2", boxShadow: "0 2px 12px rgba(255,111,0,0.1)" }}>
         <div style={{ fontWeight: 900, fontSize: 13, color: "#FF6F00", marginBottom: 10 }}>📚 단계별 학습 현황</div>
