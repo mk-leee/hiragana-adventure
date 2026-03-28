@@ -587,7 +587,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
       {/* NOTIFICATION TOAST */}
       {notification && (
         <div style={{
-          position: "fixed", top: 70, left: "50%", transform: "translateX(-50%)",
+          position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)",
           background: notification.color, color: "#333",
           borderRadius: 20, padding: "8px 20px", fontSize: 16, fontWeight: 900,
           zIndex: 9998, animation: "bounce-in 0.4s ease",
