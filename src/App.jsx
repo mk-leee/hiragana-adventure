@@ -947,6 +947,14 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
   const processingRef = useRef(false);
   const statsRef = useRef({ correct: 0, wrong: 0 });
   const isChildMode = difficulty === "beginner";
+  const [quizMode, setQuizMode] = useState("sound"); // "sound": 발음→문자 / "char": 문자→발음
+
+  const switchMode = (mode) => {
+    if (mode === quizMode) return;
+    setQuizMode(mode);
+    setSelected(null);
+    processingRef.current = false;
+  };
 
   useEffect(() => {
     const stats = statsRef.current;
@@ -999,48 +1007,65 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
 
   return (
     <div>
+      {/* 모드 선택 토글 */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, justifyContent: "center" }}>
+        {[
+          { mode: "sound", label: "🔊 발음 제시", desc: "발음→문자" },
+          { mode: "char",  label: "あ 문자 제시", desc: "문자→발음" },
+        ].map(({ mode, label }) => (
+          <button key={mode} onClick={() => switchMode(mode)} style={{
+            flex: 1, padding: "8px 4px", borderRadius: 14, fontSize: 13, fontWeight: 900,
+            background: quizMode === mode ? "linear-gradient(135deg,#FF8C00,#FFB300)" : "white",
+            color: quizMode === mode ? "white" : "#AAA",
+            border: quizMode === mode ? "2px solid #FF8C00" : "2px solid #DDD",
+            boxShadow: quizMode === mode ? "0 3px 10px rgba(255,140,0,0.3)" : "none",
+            transition: "all 0.2s",
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {/* 점수 */}
       <div style={{ textAlign: "center", marginBottom: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#888" }}>점수: {score}/{total}</div>
-        <div style={{
-          display: "inline-flex", gap: 4, marginTop: 4,
-        }}>
-          {Array.from({length:Math.min(score,10)}).map((_,i) => <span key={i} style={{fontSize:16}}>⭐</span>)}
+        <div style={{ display: "inline-flex", gap: 4, marginTop: 4 }}>
+          {Array.from({length: Math.min(score, 10)}).map((_, i) => <span key={i} style={{ fontSize: 16 }}>⭐</span>)}
         </div>
       </div>
-      <div style={{
-        textAlign: "center", marginBottom: 24,
-        animation: shake ? "wiggle 0.4s ease" : "none",
-      }}>
-        <div style={{ fontSize: 14, color: "#888", marginBottom: 8, fontWeight: 700 }}>
-          이 소리는 무엇일까요?
-        </div>
-        <div style={{
-          fontSize: 26, fontWeight: 900, color: "#FF8C00", letterSpacing: 4,
-          background: "white", borderRadius: 20, padding: "10px 20px",
-          display: "inline-block", boxShadow: "0 4px 20px rgba(255,140,0,0.2)",
-          border: "3px solid #FFD700",
-        }}>「 {current.rom} 」</div>
 
-        {/* 단어 힌트 */}
-        {hiraganaWords[current.char] && (
+      {/* 제시 카드 */}
+      <div style={{ textAlign: "center", marginBottom: 20, animation: shake ? "wiggle 0.4s ease" : "none" }}>
+        <div style={{ fontSize: 14, color: "#888", marginBottom: 8, fontWeight: 700 }}>
+          {quizMode === "sound" ? "이 소리는 무엇일까요?" : "이 글자의 발음은 무엇일까요?"}
+        </div>
+
+        {quizMode === "sound" ? (
+          /* 발음 제시 모드: 로마자 카드 */
           <div style={{
-            display: "flex", justifyContent: "center", gap: 16,
-            marginTop: 10, flexWrap: "nowrap",
-          }}>
+            fontSize: 26, fontWeight: 900, color: "#FF8C00", letterSpacing: 4,
+            background: "white", borderRadius: 20, padding: "10px 20px",
+            display: "inline-block", boxShadow: "0 4px 20px rgba(255,140,0,0.2)",
+            border: "3px solid #FFD700",
+          }}>「 {current.rom} 」</div>
+        ) : (
+          /* 문자 제시 모드: 히라가나 글자 크게 */
+          <div style={{
+            fontSize: 96, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
+            color: "#FF8C00", lineHeight: 1,
+            animation: "float 2s ease-in-out infinite",
+          }}>{current.char}</div>
+        )}
+
+        {/* 단어 힌트 (발음 제시 모드에서만) */}
+        {quizMode === "sound" && hiraganaWords[current.char] && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 10 }}>
             {hiraganaWords[current.char].slice(0, 2).map((w, i) => (
               <div key={i} style={{
                 display: "flex", alignItems: "center", gap: 4,
-                background: "rgba(255,255,255,0.7)",
-                borderRadius: 12, padding: "4px 10px",
+                background: "rgba(255,255,255,0.7)", borderRadius: 12, padding: "4px 10px",
                 boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
               }}>
                 <span style={{ fontSize: isChildMode ? 22 : 18 }}>{w.emoji}</span>
-                <span style={{
-                  fontFamily: "'Noto Sans JP', sans-serif",
-                  fontSize: isChildMode ? 16 : 14, fontWeight: 700,
-                  color: "#555",
-                }}>
-                  {/* 정답 전: 해당 글자를 ＿로 마스킹 / 정답 후 또는 어린이모드: 그대로 표시 */}
+                <span style={{ fontFamily: "'Noto Sans JP', sans-serif", fontSize: isChildMode ? 16 : 14, fontWeight: 700, color: "#555" }}>
                   {(selected || isChildMode)
                     ? w.word
                     : w.word.split("").map((ch, ci) =>
@@ -1050,18 +1075,16 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
                       )
                   }
                 </span>
-                {/* 어린이 모드: 뜻 바로 표시 / 일반: 정답 후 fade-in */}
                 {(isChildMode || selected) && (
-                  <span style={{
-                    fontSize: 12, fontWeight: 700, color: "#FF8C00",
-                    animation: !isChildMode ? "fadein 0.4s ease" : "none",
-                  }}>{w.meaning}</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#FF8C00", animation: !isChildMode ? "fadein 0.4s ease" : "none" }}>{w.meaning}</span>
                 )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* 보기 버튼 */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {choices.map(c => {
           const isCorrect = c.char === current.char;
@@ -1071,30 +1094,37 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
             if (isCorrect) { bg = "linear-gradient(135deg,#4CAF50,#8BC34A)"; color = "white"; border = "3px solid #4CAF50"; }
             else if (isSelected) { bg = "#FF5252"; color = "white"; border = "3px solid #FF5252"; }
           }
-          return (
+          return quizMode === "sound" ? (
+            /* 발음 제시: 보기=히라가나 */
             <button key={c.char} onClick={() => pick(c)} style={{
               padding: selected ? "14px 8px 10px" : "22px 8px",
-              borderRadius: 20,
-              fontSize: 44,
-              fontFamily: "'Noto Sans JP', sans-serif",
-              fontWeight: 900,
+              borderRadius: 20, fontSize: 44,
+              fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
               background: bg, color, border,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-              transition: "all 0.2s",
-              lineHeight: 1,
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)", transition: "all 0.2s",
+              lineHeight: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
             }}>
               <span>{c.char}</span>
-              {selected && (
-                <span style={{
-                  fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 800,
-                  opacity: 0.85, letterSpacing: 0.5,
-                }}>{c.rom}</span>
-              )}
+              {selected && <span style={{ fontSize: 13, fontFamily: "'Nunito', sans-serif", fontWeight: 800, opacity: 0.85 }}>{c.rom}</span>}
+            </button>
+          ) : (
+            /* 문자 제시: 보기=발음(로마자) */
+            <button key={c.char} onClick={() => pick(c)} style={{
+              padding: selected ? "18px 8px 14px" : "22px 8px",
+              borderRadius: 20, fontSize: 22,
+              fontFamily: "'Nunito', sans-serif", fontWeight: 900,
+              background: bg, color, border,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.08)", transition: "all 0.2s",
+              lineHeight: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+            }}>
+              <span style={{ letterSpacing: 1 }}>{c.rom}</span>
+              {selected && <span style={{ fontSize: 28, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900 }}>{c.char}</span>}
             </button>
           );
         })}
       </div>
+
+      {/* 오답 해설 */}
       {selected && selected.char !== current.char && (
         <button onClick={dismissWrong} style={{
           marginTop: 12, padding: "12px 14px", borderRadius: 12,
@@ -1103,11 +1133,12 @@ function QuizScreen({ reward, triggerParticles, setFoxMessage, setFoxMood, diffi
         }}>
           <div style={{ fontSize: 12, color: "#999", fontWeight: 700, marginBottom: 2 }}>오답 해설</div>
           <div style={{ fontSize: 14, color: "#E65100", fontWeight: 900 }}>
-            「{current.rom}」는 <span style={{ fontSize: 26, fontFamily: "'Noto Sans JP', sans-serif" }}>{current.char}</span> 입니다
+            {quizMode === "sound"
+              ? <>「{current.rom}」는 <span style={{ fontSize: 26, fontFamily: "'Noto Sans JP', sans-serif" }}>{current.char}</span> 입니다</>
+              : <><span style={{ fontSize: 26, fontFamily: "'Noto Sans JP', sans-serif" }}>{current.char}</span> 는 「{current.rom}」입니다</>
+            }
           </div>
-          <div style={{ fontSize: 12, color: "#FFA726", fontWeight: 800, marginTop: 8 }}>
-            탭하여 다음 문제로 →
-          </div>
+          <div style={{ fontSize: 12, color: "#FFA726", fontWeight: 800, marginTop: 8 }}>탭하여 다음 문제로 →</div>
         </button>
       )}
       {selected && selected.char === current.char && (
