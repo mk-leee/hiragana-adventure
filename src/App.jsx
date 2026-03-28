@@ -1349,9 +1349,9 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
     return () => cancelAnimationFrame(animRef.current);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const showFeedback = (msg, correct) => {
+  const showFeedback = (msg, correct, char = null, rom = null) => {
     clearTimeout(feedbackTimerRef.current);
-    setFeedback({ msg, correct });
+    setFeedback({ msg, correct, char, rom });
     feedbackTimerRef.current = setTimeout(() => setFeedback(null), 1800);
   };
 
@@ -1388,7 +1388,7 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
       recordWrong(target.char);
       statsRef.current.wrong++;
       triggerParticles(b.x, b.y);
-      showFeedback(`「${b.char.char}」는 ${b.char.rom} 소리입니다`, false);
+      showFeedback(`「${b.char.char}」는 ${b.char.rom} 소리입니다`, false, b.char.char, b.char.rom);
     }
   };
 
@@ -1452,13 +1452,45 @@ function BalloonGame({ reward, triggerParticles, difficulty = "normal", onRecord
         ))}
       </div>
 
-      {feedback && (
+      {feedback && !feedback.correct && (
         <div style={{
-          marginTop: 10, padding: "8px 14px", borderRadius: 12, textAlign: "center",
+          position: "fixed", inset: 0, zIndex: 9000,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          pointerEvents: "none",
+        }}>
+          <div style={{
+            background: "white",
+            border: "4px solid #FF5722",
+            borderRadius: 24, padding: "20px 32px",
+            textAlign: "center",
+            boxShadow: "0 8px 40px rgba(255,87,34,0.35)",
+            animation: "bounce-in 0.3s ease",
+            minWidth: 200,
+          }}>
+            <div style={{ fontSize: 13, color: "#FF5722", fontWeight: 900, marginBottom: 6 }}>
+              ❌ 오답!
+            </div>
+            <div style={{
+              fontSize: 64, fontFamily: "'Noto Sans JP', sans-serif", fontWeight: 900,
+              color: "#FF5722", lineHeight: 1,
+            }}>{feedback.char}</div>
+            <div style={{
+              fontSize: 22, fontWeight: 900, color: "#333", marginTop: 6,
+              letterSpacing: 2,
+            }}>{feedback.rom}</div>
+            <div style={{ fontSize: 12, color: "#999", marginTop: 4, fontWeight: 700 }}>
+              이 풍선은 터트리면 안 돼요!
+            </div>
+          </div>
+        </div>
+      )}
+
+      {feedback && feedback.correct && (
+        <div style={{
+          marginTop: 8, padding: "8px 14px", borderRadius: 12, textAlign: "center",
           fontWeight: 700, fontSize: 14,
-          background: feedback.correct ? "#E8F5E9" : "#FFF3E0",
-          color: feedback.correct ? "#2E7D32" : "#E65100",
-          border: `2px solid ${feedback.correct ? "#66BB6A" : "#FFA726"}`,
+          background: "#E8F5E9", color: "#2E7D32",
+          border: "2px solid #66BB6A",
         }}>{feedback.msg}</div>
       )}
 
