@@ -662,7 +662,6 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
 // HOME SCREEN
 // ============================================================
 function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage, foxMood, setScreen, charStages }) {
-  const progress = (completedChars.length / HIRAGANA.length) * 100;
   const stageCounts = [0,0,0,0,0];
   HIRAGANA.forEach(h => { stageCounts[charStages[h.char] || 0]++; });
 
