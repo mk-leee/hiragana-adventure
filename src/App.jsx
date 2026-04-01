@@ -1691,23 +1691,35 @@ function SJPTPractice({ part, onBack }) {
   const cards = part.cards;
   const [cardIdx, setCardIdx] = useState(0);
   const [round, setRound] = useState(1);
+  const [varSel, setVarSel] = useState({});
   const card = cards[cardIdx];
+
+  const isVar = card.type === "variable";
+
+  const sub = (template, key) =>
+    (card.vars || []).reduce((s, v) => {
+      const idx = varSel[v.name] ?? 0;
+      return s.replace(`{${v.name}}`, v.options[idx][key]);
+    }, template);
+
+  const displayJp = isVar ? sub(card.jp, "jp") : card.japanese;
+  const displayKr = isVar ? sub(card.kr, "kr") : card.meaning;
+  const displayHiragana = isVar ? sub(card.hiragana, "jp") : card.hiragana;
+
+  // Reset selections on card change
+  useEffect(() => { setVarSel({}); }, [cardIdx]);
 
   useEffect(() => {
     if (card.answers) {
-      // 질문 → 각 답변 순서대로 TTS
       let delay = 400;
       const timers = [];
       timers.push(setTimeout(() => speak(card.japanese), delay));
-      card.answers.forEach((a) => {
-        delay += 1800;
-        timers.push(setTimeout(() => speak(a), delay));
-      });
+      card.answers.forEach((a) => { delay += 1800; timers.push(setTimeout(() => speak(a), delay)); });
       return () => timers.forEach(clearTimeout);
     }
-    const t = setTimeout(() => speak(card.japanese), 400);
+    const t = setTimeout(() => speak(displayJp), 400);
     return () => clearTimeout(t);
-  }, [cardIdx, card.japanese]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cardIdx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const next = () => {
     if (cardIdx + 1 < cards.length) {
@@ -1750,7 +1762,6 @@ function SJPTPractice({ part, onBack }) {
       {card.answers ? (
         /* ── 사진 묘사형 카드 ── */
         <div style={{ marginBottom: 16 }}>
-          {/* 문제 박스 */}
           <div style={{
             background: part.color + "12", borderRadius: 18, padding: "16px 18px",
             border: `2px solid ${part.color}44`, marginBottom: 12,
@@ -1759,51 +1770,24 @@ function SJPTPractice({ part, onBack }) {
               <span style={{ fontSize: 36 }}>{card.emoji}</span>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: part.color, marginBottom: 2 }}>📷 상황: {card.scene}</div>
-                <div style={{
-                  fontSize: 17, fontWeight: 900, color: "#222",
-                  fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5,
-                }}>{card.japanese}</div>
+                <div style={{ fontSize: 17, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5 }}>{card.japanese}</div>
               </div>
             </div>
             <div style={{ fontSize: 12, color: "#888", fontFamily: "'Noto Sans JP', sans-serif" }}>{card.hiragana}</div>
             <div style={{ fontSize: 11, color: "#BBB", letterSpacing: 0.5 }}>{card.romaji}</div>
-            <div style={{
-              marginTop: 8, display: "inline-block",
-              background: part.color + "18", color: part.color,
-              borderRadius: 10, padding: "4px 14px", fontSize: 13, fontWeight: 900,
-            }}>{card.meaning}</div>
+            <div style={{ marginTop: 8, display: "inline-block", background: part.color + "18", color: part.color, borderRadius: 10, padding: "4px 14px", fontSize: 13, fontWeight: 900 }}>{card.meaning}</div>
           </div>
-          {/* 답변 문장들 */}
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#888", marginBottom: 6, letterSpacing: 0.5 }}>
-            👉 모범 답변
-          </div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#888", marginBottom: 6, letterSpacing: 0.5 }}>👉 모범 답변</div>
           {card.answers.map((ans, i) => (
-            <div key={i} style={{
-              display: "flex", alignItems: "center", gap: 10, marginBottom: 8,
-              background: "white", borderRadius: 14, padding: "12px 16px",
-              boxShadow: `0 2px 10px ${part.color}18`,
-              border: `1.5px solid ${part.color}22`,
-            }}>
-              <span style={{
-                minWidth: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center",
-                justifyContent: "center", fontSize: 11, fontWeight: 900,
-                background: part.color, color: "white",
-              }}>{i + 1}</span>
-              <div>
-                <div style={{
-                  fontSize: 16, fontWeight: 900, color: "#222",
-                  fontFamily: "'Noto Sans JP', sans-serif",
-                }}>{ans}</div>
-              </div>
-              <button onClick={() => speak(ans)} style={{
-                marginLeft: "auto", background: "none", border: "none",
-                fontSize: 18, cursor: "pointer", opacity: 0.6,
-              }}>🔊</button>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, background: "white", borderRadius: 14, padding: "12px 16px", boxShadow: `0 2px 10px ${part.color}18`, border: `1.5px solid ${part.color}22` }}>
+              <span style={{ minWidth: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, background: part.color, color: "white" }}>{i + 1}</span>
+              <div style={{ fontSize: 16, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif" }}>{ans}</div>
+              <button onClick={() => speak(ans)} style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", opacity: 0.6 }}>🔊</button>
             </div>
           ))}
         </div>
       ) : (
-        /* ── 일반 카드 ── */
+        /* ── variable / 일반 카드 ── */
         <div style={{
           background: "white", borderRadius: 24, padding: "24px 20px",
           boxShadow: `0 6px 24px ${part.color}30`,
@@ -1811,33 +1795,50 @@ function SJPTPractice({ part, onBack }) {
           textAlign: "center", marginBottom: 16,
         }}>
           <div style={{ fontSize: 64, marginBottom: 12 }}>{card.emoji}</div>
-          <div style={{
-            fontSize: 20, fontWeight: 900, color: "#222",
-            fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 6,
-          }}>{card.japanese}</div>
-          <div style={{
-            fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4,
-          }}>{card.hiragana}</div>
-          <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 12 }}>
-            {card.romaji}
-          </div>
-          <div style={{
-            display: "inline-block", background: part.color + "18",
-            color: part.color, borderRadius: 12, padding: "8px 20px",
-            fontSize: 16, fontWeight: 900, marginBottom: card.tip ? 10 : 0,
-          }}>{card.meaning}</div>
+          <div style={{ fontSize: 20, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 6 }}>{displayJp}</div>
+          <div style={{ fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4 }}>{displayHiragana}</div>
+          {!isVar && <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 12 }}>{card.romaji}</div>}
+          <div style={{ display: "inline-block", background: part.color + "18", color: part.color, borderRadius: 12, padding: "8px 20px", fontSize: 15, fontWeight: 900, marginBottom: 10 }}>{displayKr}</div>
+
+          {/* 변수 선택 칩 (variable 타입 카드만) */}
+          {isVar && (card.vars || []).map(v => (
+            <div key={v.name} style={{ marginTop: 10, textAlign: "left" }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "#999", marginBottom: 6 }}>{v.label}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {v.options.map((opt, i) => {
+                  const sel = (varSel[v.name] ?? 0) === i;
+                  return (
+                    <button key={i} onClick={() => {
+                      setVarSel(s => ({ ...s, [v.name]: i }));
+                      const assembled = (card.vars || []).reduce((str, vv) => {
+                        const idx = vv.name === v.name ? i : (varSel[vv.name] ?? 0);
+                        return str.replace(`{${vv.name}}`, vv.options[idx].jp);
+                      }, card.jp);
+                      speak(assembled);
+                    }} style={{
+                      padding: "5px 12px", borderRadius: 20, fontSize: 13, fontWeight: 800,
+                      border: `2px solid ${sel ? part.color : "#DDD"}`,
+                      background: sel ? part.color : "white",
+                      color: sel ? "white" : "#555",
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}>
+                      {opt.jp}<span style={{ fontSize: 10, opacity: 0.75, marginLeft: 4 }}>({opt.kr})</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
           {card.tip && (
-            <div style={{
-              marginTop: 10, fontSize: 11, color: "#FF8C00", fontWeight: 700,
-              background: "#FFF8E1", borderRadius: 10, padding: "6px 12px",
-            }}>💡 {card.tip}</div>
+            <div style={{ marginTop: 12, fontSize: 11, color: "#FF8C00", fontWeight: 700, background: "#FFF8E1", borderRadius: 10, padding: "6px 12px", textAlign: "left" }}>💡 {card.tip}</div>
           )}
         </div>
-      )}
+      )} 2bbf8fc (Add interactive variable selection to SJPT Part 2 그림 묘사)
 
       {/* 버튼 */}
       <div style={{ display: "flex", gap: 10 }}>
-        <button onClick={() => speak(card.japanese)} style={{
+        <button onClick={() => speak(displayJp)} style={{
           flex: 1, padding: "13px", borderRadius: 16, fontSize: 14, fontWeight: 900,
           background: "white", color: part.color, border: `2px solid ${part.color}`,
         }}>🔊 다시 듣기</button>
