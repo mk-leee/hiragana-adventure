@@ -1714,7 +1714,7 @@ function SJPTPractice({ part, onBack }) {
       let delay = 400;
       const timers = [];
       timers.push(setTimeout(() => speak(card.japanese), delay));
-      card.answers.forEach((a) => { delay += 1800; timers.push(setTimeout(() => speak(a), delay)); });
+      card.answers.forEach((a) => { delay += 1800; timers.push(setTimeout(() => speak(a.jp), delay)); });
       return () => timers.forEach(clearTimeout);
     }
     const t = setTimeout(() => speak(displayJp), 400);
@@ -1728,6 +1728,10 @@ function SJPTPractice({ part, onBack }) {
       setCardIdx(0);
       setRound(r => r + 1);
     }
+  };
+
+  const prev = () => {
+    if (cardIdx > 0) setCardIdx(i => i - 1);
   };
 
   return (
@@ -1754,8 +1758,18 @@ function SJPTPractice({ part, onBack }) {
           }} />
         ))}
       </div>
-      <div style={{ fontSize: 11, color: "#AAA", textAlign: "right", marginBottom: 12 }}>
-        {cardIdx + 1} / {cards.length}  {round > 1 && `(${round}회차)`}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+        <button onClick={prev} disabled={cardIdx === 0} style={{
+          padding: "6px 14px", borderRadius: 12, fontSize: 18, fontWeight: 900,
+          background: cardIdx === 0 ? "#F5F5F5" : "white",
+          color: cardIdx === 0 ? "#CCC" : part.color,
+          border: `2px solid ${cardIdx === 0 ? "#EEE" : part.color}`,
+          cursor: cardIdx === 0 ? "default" : "pointer",
+        }}>‹</button>
+        <span style={{ fontSize: 11, color: "#AAA" }}>
+          {cardIdx + 1} / {cards.length}  {round > 1 && `(${round}회차)`}
+        </span>
+        <div style={{ width: 46 }} />
       </div>
 
       {/* 카드 */}
@@ -1780,9 +1794,12 @@ function SJPTPractice({ part, onBack }) {
           <div style={{ fontSize: 11, fontWeight: 800, color: "#888", marginBottom: 6, letterSpacing: 0.5 }}>👉 모범 답변</div>
           {card.answers.map((ans, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, background: "white", borderRadius: 14, padding: "12px 16px", boxShadow: `0 2px 10px ${part.color}18`, border: `1.5px solid ${part.color}22` }}>
-              <span style={{ minWidth: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, background: part.color, color: "white" }}>{i + 1}</span>
-              <div style={{ fontSize: 16, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif" }}>{ans}</div>
-              <button onClick={() => speak(ans)} style={{ marginLeft: "auto", background: "none", border: "none", fontSize: 18, cursor: "pointer", opacity: 0.6 }}>🔊</button>
+              <span style={{ minWidth: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, background: part.color, color: "white", flexShrink: 0 }}>{i + 1}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif" }}>{ans.jp}</div>
+                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{ans.kr}</div>
+              </div>
+              <button onClick={() => speak(ans.jp)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", opacity: 0.6, flexShrink: 0 }}>🔊</button>
             </div>
           ))}
         </div>
@@ -1834,7 +1851,7 @@ function SJPTPractice({ part, onBack }) {
             <div style={{ marginTop: 12, fontSize: 11, color: "#FF8C00", fontWeight: 700, background: "#FFF8E1", borderRadius: 10, padding: "6px 12px", textAlign: "left" }}>💡 {card.tip}</div>
           )}
         </div>
-      )} 2bbf8fc (Add interactive variable selection to SJPT Part 2 그림 묘사)
+      )}
 
       {/* 버튼 */}
       <div style={{ display: "flex", gap: 10 }}>
