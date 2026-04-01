@@ -674,7 +674,6 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
     { id: "quiz",    icon: "🎯", label: "퀴즈 도전",     color: "#E91E63", bg: "#FCE4EC" },
     { id: "fishing", icon: "🎣", label: "낚시 게임",     color: "#2196F3", bg: "#E3F2FD" },
     { id: "balloon", icon: "🎈", label: "풍선 터트리기", color: "#9C27B0", bg: "#F3E5F5" },
-    { id: "draw",    icon: "✍️", label: "써보기",        color: "#4CAF50", bg: "#E8F5E9" },
     { id: "sjpt",   icon: "🎧", label: "SJPT 특훈",     color: "#00BCD4", bg: "#E0F7FA" },
     { id: "shop",    icon: "🛒", label: "포인트 샵",     color: "#FF5722", bg: "#FBE9E7" },
   ];
