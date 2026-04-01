@@ -649,9 +649,15 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
                 background: "#F5F5F5", color: "#555", border: "none",
               }}>취소</button>
               <button onClick={() => {
-                allowingBackRef.current = true;
                 setShowBackConfirm(false);
-                window.history.go(-2); // 앱 히스토리 2개(pushState×2) 뒤로
+                if (screen === "home") {
+                  // 홈에서 뒤로 → 앱 종료 시도
+                  allowingBackRef.current = true;
+                  window.history.go(-2);
+                } else {
+                  // 서브화면에서 뒤로 → 홈 메뉴로
+                  setScreen("home");
+                }
               }} style={{
                 flex: 1, padding: "12px 0", borderRadius: 14, fontSize: 15, fontWeight: 900,
                 background: "linear-gradient(135deg, #FF8C00, #FF6347)",
