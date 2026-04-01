@@ -11,11 +11,11 @@ const SJPT_PARTS = [
       {
         id: 1,
         emoji: "👤",
-        japanese: "わたしは キムです。",
-        hiragana: "わたしは きむです",
-        romaji: "watashi wa Kimu desu",
-        meaning: "저는 김입니다",
-        tip: "[이름] 부분을 본인 이름으로 바꿔 연습하세요",
+        japanese: "わたしは まんきゅうです。",
+        hiragana: "わたしは まんきゅうです",
+        romaji: "watashi wa Mankyu desu",
+        meaning: "저는 만규입니다",
+        tip: "자기 이름을 히라가나로 또렷하게 말하세요",
       },
       {
         id: 2,
@@ -29,11 +29,11 @@ const SJPT_PARTS = [
       {
         id: 3,
         emoji: "🎂",
-        japanese: "たんじょうびは さんがつ じゅうごにちです。",
-        hiragana: "たんじょうびは さんがつ じゅうごにちです",
-        romaji: "tanjoubi wa san-gatsu juugo-nichi desu",
-        meaning: "생일은 3월 15일입니다",
-        tip: "[월]がつ [일]にち — 본인 생일로 바꿔 연습하세요",
+        japanese: "たんじょうびは じゅうにがつ とおかです。",
+        hiragana: "たんじょうびは じゅうにがつ とおかです",
+        romaji: "tanjoubi wa juuni-gatsu tooka desu",
+        meaning: "생일은 12월 10일입니다",
+        tip: "10일은 とおか — 불규칙 날짜이니 통째로 외우세요",
       },
       {
         id: 4,
