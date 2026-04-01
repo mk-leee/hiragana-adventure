@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import pkg from "../package.json";
 import hiraganaWords from "./data/hiraganaWords";
+import SJPT_PHRASES from "./data/sjptPhrases";
 const version = pkg.version;
 
 // ============================================================
@@ -506,6 +507,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
       s === "balloon" ? "풍선을 터트려봐! 빵! 💥" :
       s === "shop" ? "뭘 살까? 골라골라~" :
       s === "draw" ? "손가락으로 써봐! ✍️" :
+      s === "sjpt" ? "귀와 입으로 외워봐! 🎧" :
       `안녕 ${userInfo.name}! 나는 히라코야! 오늘도 같이 공부하자~`
     );
     setFoxMood(s === "shop" ? "thinking" : "happy");
@@ -606,6 +608,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
         {screen === "shop" && <ShopScreen points={points} setPoints={setPoints} owned={owned} setOwned={setOwned} setCurrentRoom={setCurrentRoom} />}
         {screen === "draw" && <DrawScreen reward={reward} triggerParticles={triggerParticles} difficulty={difficulty} onRecord={onRecord} />}
         {screen === "parent" && <ParentScreen parentUnlocked={parentUnlocked} setParentUnlocked={setParentUnlocked} parentPin={parentPin} setParentPin={setParentPin} wrongPin={wrongPin} setWrongPin={setWrongPin} completedChars={completedChars} points={points} candies={candies} setRewardMultiplier={setRewardMultiplier} />}
+        {screen === "sjpt" && <SJPTScreen reward={reward} />}
       </div>
 
       {/* FOX ASSISTANT — always visible on home */}
@@ -672,6 +675,7 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
     { id: "fishing", icon: "🎣", label: "낚시 게임",     color: "#2196F3", bg: "#E3F2FD" },
     { id: "balloon", icon: "🎈", label: "풍선 터트리기", color: "#9C27B0", bg: "#F3E5F5" },
     { id: "draw",    icon: "✍️", label: "써보기",        color: "#4CAF50", bg: "#E8F5E9" },
+    { id: "sjpt",   icon: "🎧", label: "SJPT 특훈",     color: "#00BCD4", bg: "#E0F7FA" },
     { id: "shop",    icon: "🛒", label: "포인트 샵",     color: "#FF5722", bg: "#FBE9E7" },
   ];
 
@@ -1664,6 +1668,237 @@ function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord 
             background: "linear-gradient(135deg, #FF8C00, #FFB300)", color: "white",
             border: "none", boxShadow: "0 4px 12px rgba(255,140,0,0.4)",
           }}>다음 글자 ➡</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// SJPT 특훈
+// ============================================================
+function SJPTScreen({ reward }) {
+  const MODES = [
+    { id: "shadow", icon: "🔊", label: "따라하기" },
+    { id: "listen", icon: "🎧", label: "듣고 고르기" },
+    { id: "image",  icon: "🖼️", label: "이미지 연결" },
+  ];
+
+  const [mode, setMode] = useState("shadow");
+  const [idx, setIdx] = useState(() => Math.floor(Math.random() * SJPT_PHRASES.length));
+  const [selected, setSelected] = useState(null);
+  const [score, setScore] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [choices, setChoices] = useState([]);
+  const processingRef = useRef(false);
+
+  const current = SJPT_PHRASES[idx];
+
+  const makeChoices = useCallback((cur) => {
+    const others = SJPT_PHRASES.filter(p => p.id !== cur.id)
+      .sort(() => Math.random() - 0.5).slice(0, 3);
+    return [cur, ...others].sort(() => Math.random() - 0.5);
+  }, []);
+
+  const nextPhrase = useCallback(() => {
+    setSelected(null);
+    processingRef.current = false;
+    setIdx(i => {
+      let n;
+      do { n = Math.floor(Math.random() * SJPT_PHRASES.length); } while (n === i);
+      return n;
+    });
+  }, []);
+
+  // 모드 전환 시 초기화
+  const switchMode = (m) => {
+    setMode(m);
+    setSelected(null);
+    processingRef.current = false;
+  };
+
+  // 새 문장 / 모드 변경 시 선택지 재생성 + 자동 TTS
+  useEffect(() => {
+    setChoices(makeChoices(current));
+    if (mode === "listen") {
+      const t = setTimeout(() => speak(current.japanese), 600);
+      return () => clearTimeout(t);
+    }
+    if (mode === "shadow") {
+      const t = setTimeout(() => speak(current.japanese), 400);
+      return () => clearTimeout(t);
+    }
+  }, [idx, mode, current, makeChoices]);
+
+  const pick = (choice) => {
+    if (processingRef.current || selected) return;
+    processingRef.current = true;
+    setSelected(choice);
+    setTotal(t => t + 1);
+    const correct = choice.id === current.id;
+    if (correct) {
+      setScore(s => s + 1);
+      reward(10, "잘 들었어요! 🎵", "excited");
+    }
+    speak(current.japanese);
+    if (correct) setTimeout(() => nextPhrase(), 1600);
+  };
+
+  const CATEGORY_COLOR = { 일상: "#FF8C00", 관계: "#E91E63", 인사: "#9C27B0", 이동: "#2196F3", 직장: "#4CAF50", 학교: "#009688" };
+  const catColor = CATEGORY_COLOR[current.category] || "#888";
+
+  return (
+    <div>
+      {/* 모드 탭 */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {MODES.map(m => (
+          <button key={m.id} onClick={() => switchMode(m.id)} style={{
+            flex: 1, padding: "8px 4px", borderRadius: 14, fontSize: 12, fontWeight: 900,
+            background: mode === m.id ? "linear-gradient(135deg,#00BCD4,#0097A7)" : "white",
+            color: mode === m.id ? "white" : "#AAA",
+            border: mode === m.id ? "2px solid #00BCD4" : "2px solid #DDD",
+            transition: "all 0.2s",
+          }}>{m.icon} {m.label}</button>
+        ))}
+      </div>
+
+      {/* 점수 */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: "#888" }}>점수: {score}/{total}</span>
+        <span style={{
+          fontSize: 11, fontWeight: 800, background: catColor + "22",
+          color: catColor, borderRadius: 10, padding: "2px 10px",
+        }}>{current.category}</span>
+      </div>
+
+      {/* ── 따라하기 모드 ── */}
+      {mode === "shadow" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 72, marginBottom: 8 }}>{current.emoji}</div>
+          <div style={{
+            fontSize: 22, fontWeight: 900, color: "#333", marginBottom: 4,
+            fontFamily: "'Noto Sans JP', sans-serif",
+          }}>{current.japanese}</div>
+          <div style={{ fontSize: 14, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4 }}>
+            {current.hiragana}
+          </div>
+          <div style={{ fontSize: 13, color: "#aaa", marginBottom: 2, letterSpacing: 1 }}>{current.romaji}</div>
+          <div style={{
+            fontSize: 18, fontWeight: 900, color: "#00BCD4",
+            background: "#E0F7FA", borderRadius: 12, padding: "8px 20px",
+            display: "inline-block", marginBottom: 20,
+          }}>{current.meaning}</div>
+
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={() => speak(current.japanese)} style={{
+              flex: 1, padding: "12px", borderRadius: 16, fontSize: 14, fontWeight: 900,
+              background: "white", color: "#00BCD4", border: "2px solid #00BCD4",
+            }}>🔊 다시 듣기</button>
+            <button onClick={nextPhrase} style={{
+              flex: 2, padding: "12px", borderRadius: 16, fontSize: 14, fontWeight: 900,
+              background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "white", border: "none",
+              boxShadow: "0 4px 12px rgba(0,188,212,0.4)",
+            }}>👄 따라했어요 →</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 듣고 고르기 모드 ── */}
+      {mode === "listen" && (
+        <div>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div style={{ fontSize: 13, color: "#888", fontWeight: 700, marginBottom: 10 }}>
+              들리는 소리의 뜻을 고르세요
+            </div>
+            <button onClick={() => speak(current.japanese)} style={{
+              padding: "14px 32px", borderRadius: 20, fontSize: 16, fontWeight: 900,
+              background: "linear-gradient(135deg,#00BCD4,#0097A7)", color: "white", border: "none",
+              boxShadow: "0 4px 16px rgba(0,188,212,0.4)", animation: !selected ? "pulse 2s infinite" : "none",
+            }}>🎧 다시 듣기</button>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            {choices.map(c => {
+              const isCorrect = c.id === current.id;
+              const isSelected = selected?.id === c.id;
+              let bg = "white", border = "2px solid #DDD", color = "#333";
+              if (selected) {
+                if (isCorrect) { bg = "linear-gradient(135deg,#4CAF50,#8BC34A)"; color = "white"; border = "2px solid #4CAF50"; }
+                else if (isSelected) { bg = "#FF5252"; color = "white"; border = "2px solid #FF5252"; }
+              }
+              return (
+                <button key={c.id} onClick={() => pick(c)} style={{
+                  padding: "16px 8px", borderRadius: 16, fontSize: 13, fontWeight: 800,
+                  background: bg, color, border,
+                  boxShadow: "0 3px 10px rgba(0,0,0,0.07)", transition: "all 0.2s", lineHeight: 1.4,
+                }}>
+                  {c.meaning}
+                  {selected && isCorrect && (
+                    <div style={{ fontSize: 11, opacity: 0.85, marginTop: 4, fontFamily: "'Noto Sans JP', sans-serif" }}>
+                      {c.japanese}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {selected && !processingRef.current && selected.id !== current.id && (
+            <button onClick={nextPhrase} style={{
+              marginTop: 12, width: "100%", padding: "12px", borderRadius: 14,
+              background: "#FFF3E0", border: "2px solid #FFA726",
+              fontSize: 13, fontWeight: 900, color: "#E65100",
+            }}>
+              <div style={{ marginBottom: 4 }}>정답: {current.meaning}</div>
+              <div style={{ fontFamily: "'Noto Sans JP', sans-serif", fontSize: 14 }}>{current.japanese}</div>
+              <div style={{ fontSize: 11, color: "#FFA726", marginTop: 6 }}>탭하여 다음 문장으로 →</div>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── 이미지 연결 모드 ── */}
+      {mode === "image" && (
+        <div>
+          <div style={{ textAlign: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: 13, color: "#888", fontWeight: 700, marginBottom: 6 }}>
+              이 그림에 맞는 일본어 문장은?
+            </div>
+            <div style={{ fontSize: 80 }}>{current.emoji}</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {choices.map(c => {
+              const isCorrect = c.id === current.id;
+              const isSelected = selected?.id === c.id;
+              let bg = "white", border = "2px solid #DDD", color = "#333";
+              if (selected) {
+                if (isCorrect) { bg = "linear-gradient(135deg,#4CAF50,#8BC34A)"; color = "white"; border = "2px solid #4CAF50"; }
+                else if (isSelected) { bg = "#FF5252"; color = "white"; border = "2px solid #FF5252"; }
+              }
+              return (
+                <button key={c.id} onClick={() => pick(c)} style={{
+                  padding: "14px 16px", borderRadius: 16, textAlign: "left",
+                  background: bg, color, border,
+                  boxShadow: "0 3px 10px rgba(0,0,0,0.07)", transition: "all 0.2s",
+                  display: "flex", flexDirection: "column", gap: 2,
+                }}>
+                  <span style={{ fontSize: 15, fontWeight: 900, fontFamily: "'Noto Sans JP', sans-serif" }}>
+                    {c.emoji} {c.japanese}
+                  </span>
+                  {(selected) && (
+                    <span style={{ fontSize: 11, opacity: 0.8 }}>{c.hiragana} · {c.meaning}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {selected && selected.id !== current.id && (
+            <button onClick={nextPhrase} style={{
+              marginTop: 12, width: "100%", padding: "12px", borderRadius: 14,
+              background: "#FFF3E0", border: "2px solid #FFA726",
+              fontSize: 12, fontWeight: 900, color: "#E65100",
+            }}>
+              탭하여 다음 문장으로 →
+            </button>
+          )}
         </div>
       )}
     </div>
