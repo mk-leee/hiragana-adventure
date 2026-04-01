@@ -458,11 +458,13 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
   const [charStages, setCharStages] = useState(userData.charStages || {});
   const [funnelKey, setFunnelKey] = useState(0);
   const [showBackConfirm, setShowBackConfirm] = useState(false);
+  const allowingBackRef = useRef(false);
 
   // Android 뒤로가기 소프트키 가로채기
   useEffect(() => {
     window.history.pushState({ app: true }, "");
     const handlePopState = () => {
+      if (allowingBackRef.current) return; // 나가기 확인 후 허용된 이탈
       setShowBackConfirm(true);
       window.history.pushState({ app: true }, ""); // 히스토리 재추가 (이탈 방지)
     };
@@ -647,6 +649,7 @@ function UserApp({ userId, difficulty, onSwitchUser }) {
                 background: "#F5F5F5", color: "#555", border: "none",
               }}>취소</button>
               <button onClick={() => {
+                allowingBackRef.current = true;
                 setShowBackConfirm(false);
                 window.history.go(-2); // 앱 히스토리 2개(pushState×2) 뒤로
               }} style={{
