@@ -1774,34 +1774,57 @@ function SJPTPractice({ part, onBack }) {
 
       {/* 카드 */}
       {card.answers ? (
-        /* ── 사진 묘사형 카드 ── */
-        <div style={{ marginBottom: 16 }}>
+        /* ── 사진 묘사형 카드 (1~4번과 동일한 흰 카드 스타일) ── */
+        <div style={{
+          background: "white", borderRadius: 24, padding: "24px 20px",
+          boxShadow: `0 6px 24px ${part.color}30`,
+          border: `2px solid ${part.color}33`,
+          textAlign: "center", marginBottom: 16,
+        }}>
+          <div style={{ fontSize: 64, marginBottom: 6 }}>{card.emoji}</div>
           <div style={{
-            background: part.color + "12", borderRadius: 18, padding: "16px 18px",
-            border: `2px solid ${part.color}44`, marginBottom: 12,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 36 }}>{card.emoji}</span>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: part.color, marginBottom: 2 }}>📷 상황: {card.scene}</div>
-                <div style={{ fontSize: 17, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5 }}>{card.japanese}</div>
-              </div>
+            display: "inline-block", fontSize: 11, fontWeight: 700,
+            color: part.color, background: part.color + "12",
+            borderRadius: 20, padding: "3px 12px", marginBottom: 10,
+          }}>📷 {card.scene}</div>
+          <div style={{
+            fontSize: 20, fontWeight: 900, color: "#222",
+            fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 4,
+          }}>{card.japanese}</div>
+          <div style={{ fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4 }}>{card.hiragana}</div>
+          <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 10 }}>{card.romaji}</div>
+          <div style={{
+            display: "inline-block", background: part.color + "18",
+            color: part.color, borderRadius: 12, padding: "7px 20px",
+            fontSize: 15, fontWeight: 900, marginBottom: 18,
+          }}>{card.meaning}</div>
+
+          {/* 답변 목록 — variable 칩과 유사한 스타일 */}
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: "#999", marginBottom: 8 }}>👉 모범 답변</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {card.answers.map((ans, i) => (
+                <button key={i} onClick={() => speak(ans.jp)} style={{
+                  padding: "10px 14px", borderRadius: 16, textAlign: "left",
+                  border: `2px solid ${part.color}33`,
+                  background: part.color + "0A",
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+                  transition: "all 0.15s",
+                }}>
+                  <span style={{
+                    minWidth: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, fontWeight: 900, background: part.color, color: "white",
+                  }}>{i + 1}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif" }}>{ans.jp}</div>
+                    <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{ans.kr}</div>
+                  </div>
+                  <span style={{ fontSize: 16, opacity: 0.45, flexShrink: 0 }}>🔊</span>
+                </button>
+              ))}
             </div>
-            <div style={{ fontSize: 12, color: "#888", fontFamily: "'Noto Sans JP', sans-serif" }}>{card.hiragana}</div>
-            <div style={{ fontSize: 11, color: "#BBB", letterSpacing: 0.5 }}>{card.romaji}</div>
-            <div style={{ marginTop: 8, display: "inline-block", background: part.color + "18", color: part.color, borderRadius: 10, padding: "4px 14px", fontSize: 13, fontWeight: 900 }}>{card.meaning}</div>
           </div>
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#888", marginBottom: 6, letterSpacing: 0.5 }}>👉 모범 답변</div>
-          {card.answers.map((ans, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, background: "white", borderRadius: 14, padding: "12px 16px", boxShadow: `0 2px 10px ${part.color}18`, border: `1.5px solid ${part.color}22` }}>
-              <span style={{ minWidth: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, background: part.color, color: "white", flexShrink: 0 }}>{i + 1}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif" }}>{ans.jp}</div>
-                <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{ans.kr}</div>
-              </div>
-              <button onClick={() => speak(ans.jp)} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", opacity: 0.6, flexShrink: 0 }}>🔊</button>
-            </div>
-          ))}
         </div>
       ) : (
         /* ── variable / 일반 카드 ── */
