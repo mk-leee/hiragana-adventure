@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import pkg from "../package.json";
 import hiraganaWords from "./data/hiraganaWords";
 import SJPT_PHRASES from "./data/sjptPhrases";
+import SJPT_PARTS from "./data/sjptParts";
 const version = pkg.version;
 
 // ============================================================
@@ -674,7 +675,6 @@ function HomeScreen({ showScreen, reward, completedChars, foxDancing, foxMessage
     { id: "quiz",    icon: "🎯", label: "퀴즈 도전",     color: "#E91E63", bg: "#FCE4EC" },
     { id: "fishing", icon: "🎣", label: "낚시 게임",     color: "#2196F3", bg: "#E3F2FD" },
     { id: "balloon", icon: "🎈", label: "풍선 터트리기", color: "#9C27B0", bg: "#F3E5F5" },
-    { id: "draw",    icon: "✍️", label: "써보기",        color: "#4CAF50", bg: "#E8F5E9" },
     { id: "sjpt",   icon: "🎧", label: "SJPT 특훈",     color: "#00BCD4", bg: "#E0F7FA" },
     { id: "shop",    icon: "🛒", label: "포인트 샵",     color: "#FF5722", bg: "#FBE9E7" },
   ];
@@ -1677,7 +1677,107 @@ function DrawScreen({ reward, triggerParticles, difficulty = "normal", onRecord 
 // ============================================================
 // SJPT 특훈
 // ============================================================
-function SJPTScreen({ reward }) {
+// ── SJPT 파트별 카드 연습 (공용 컴포넌트) ──────────────────
+function SJPTPractice({ part, onBack }) {
+  const cards = part.cards;
+  const [cardIdx, setCardIdx] = useState(0);
+  const [round, setRound] = useState(1);
+  const card = cards[cardIdx];
+
+  useEffect(() => {
+    const t = setTimeout(() => speak(card.japanese), 400);
+    return () => clearTimeout(t);
+  }, [cardIdx, card.japanese]);
+
+  const next = () => {
+    if (cardIdx + 1 < cards.length) {
+      setCardIdx(i => i + 1);
+    } else {
+      setCardIdx(0);
+      setRound(r => r + 1);
+    }
+  };
+
+  return (
+    <div>
+      {/* 헤더 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <button onClick={onBack} style={{
+          padding: "6px 14px", borderRadius: 12, fontSize: 13, fontWeight: 900,
+          background: "white", color: part.color, border: `2px solid ${part.color}`,
+        }}>← 메뉴</button>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 900, color: part.color }}>{part.icon} {part.title}</div>
+          <div style={{ fontSize: 11, color: "#AAA" }}>{part.desc}</div>
+        </div>
+      </div>
+
+      {/* 진행 바 */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+        {cards.map((_, i) => (
+          <div key={i} style={{
+            flex: 1, height: 4, borderRadius: 4,
+            background: i <= cardIdx ? part.color : "#EEE",
+            transition: "background 0.3s",
+          }} />
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: "#AAA", textAlign: "right", marginBottom: 12 }}>
+        {cardIdx + 1} / {cards.length}  {round > 1 && `(${round}회차)`}
+      </div>
+
+      {/* 카드 */}
+      <div style={{
+        background: "white", borderRadius: 24, padding: "24px 20px",
+        boxShadow: `0 6px 24px ${part.color}30`,
+        border: `2px solid ${part.color}33`,
+        textAlign: "center", marginBottom: 16,
+      }}>
+        <div style={{ fontSize: 64, marginBottom: 12 }}>{card.emoji}</div>
+        <div style={{
+          fontSize: 20, fontWeight: 900, color: "#222",
+          fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 6,
+        }}>{card.japanese}</div>
+        <div style={{
+          fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4,
+        }}>{card.hiragana}</div>
+        <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 12 }}>
+          {card.romaji}
+        </div>
+        <div style={{
+          display: "inline-block", background: part.color + "18",
+          color: part.color, borderRadius: 12, padding: "8px 20px",
+          fontSize: 16, fontWeight: 900, marginBottom: card.tip ? 10 : 0,
+        }}>{card.meaning}</div>
+        {card.tip && (
+          <div style={{
+            marginTop: 10, fontSize: 11, color: "#FF8C00", fontWeight: 700,
+            background: "#FFF8E1", borderRadius: 10, padding: "6px 12px",
+          }}>💡 {card.tip}</div>
+        )}
+      </div>
+
+      {/* 버튼 */}
+      <div style={{ display: "flex", gap: 10 }}>
+        <button onClick={() => speak(card.japanese)} style={{
+          flex: 1, padding: "13px", borderRadius: 16, fontSize: 14, fontWeight: 900,
+          background: "white", color: part.color, border: `2px solid ${part.color}`,
+        }}>🔊 다시 듣기</button>
+        <button onClick={next} style={{
+          flex: 2, padding: "13px", borderRadius: 16, fontSize: 14, fontWeight: 900,
+          background: `linear-gradient(135deg, ${part.color}, ${part.color}BB)`,
+          color: "white", border: "none",
+          boxShadow: `0 4px 14px ${part.color}50`,
+        }}>
+          {cardIdx + 1 < cards.length ? "👄 따라했어요 →" : "🔄 처음부터 다시"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── SJPT 기본 연습 (3모드 — 기존 로직) ───────────────────────
+function SJPTBasic({ reward }) {
   const MODES = [
     { id: "shadow", icon: "🔊", label: "따라하기" },
     { id: "listen", icon: "🎧", label: "듣고 고르기" },
@@ -1901,6 +2001,65 @@ function SJPTScreen({ reward }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function SJPTScreen({ reward }) {
+  const [section, setSection] = useState(null);
+
+  if (section === "basic") return (
+    <div>
+      <button onClick={() => setSection(null)} style={{
+        margin: "12px 16px 0", padding: "8px 18px", borderRadius: 20,
+        background: "#E0F7FA", border: "2px solid #00BCD4",
+        fontSize: 14, fontWeight: 800, color: "#00838F", cursor: "pointer",
+      }}>← 메뉴</button>
+      <SJPTBasic reward={reward} />
+    </div>
+  );
+
+  const part = SJPT_PARTS.find(p => p.id === section);
+  if (part) return <SJPTPractice part={part} onBack={() => setSection(null)} />;
+
+  // Main menu
+  return (
+    <div style={{ padding: "16px 16px 100px", maxWidth: 480, margin: "0 auto" }}>
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ fontSize: 32 }}>🎧</div>
+        <div style={{ fontSize: 22, fontWeight: 900, color: "#00838F" }}>SJPT 특훈</div>
+        <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>귀와 입으로 외워요!</div>
+      </div>
+
+      {/* 기본 연습 */}
+      <button onClick={() => setSection("basic")} style={{
+        width: "100%", padding: "18px 20px", marginBottom: 12,
+        borderRadius: 18, border: "none", cursor: "pointer",
+        background: "linear-gradient(135deg, #00BCD4, #0097A7)",
+        boxShadow: "0 4px 16px rgba(0,188,212,0.4)",
+        display: "flex", alignItems: "center", gap: 14, textAlign: "left",
+      }}>
+        <span style={{ fontSize: 32 }}>🔊</span>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: "white" }}>기본 연습</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>덩어리 문장 듣고 따라말하기</div>
+        </div>
+      </button>
+
+      {/* Part buttons */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {SJPT_PARTS.map(part => (
+          <button key={part.id} onClick={() => setSection(part.id)} style={{
+            padding: "16px 12px", borderRadius: 16, border: `2px solid ${part.color}30`,
+            cursor: "pointer", background: part.bg, textAlign: "left",
+            display: "flex", flexDirection: "column", gap: 6,
+          }}>
+            <div style={{ fontSize: 26 }}>{part.icon}</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: part.color, lineHeight: 1.3 }}>{part.title}</div>
+            <div style={{ fontSize: 11, color: "#888" }}>{part.desc}</div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
