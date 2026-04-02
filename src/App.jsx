@@ -1817,7 +1817,8 @@ function SJPTPractice({ part, onBack }) {
                   }}>{i + 1}</span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 15, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif" }}>{ans.jp}</div>
-                    <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{ans.kr}</div>
+                    {ans.pron && <div style={{ fontSize: 11, color: "#BBB", marginTop: 1 }}>{ans.pron}</div>}
+                    <div style={{ fontSize: 12, color: "#888", marginTop: 1 }}>{ans.kr}</div>
                   </div>
                   <span style={{ fontSize: 16, opacity: 0.45, flexShrink: 0 }}>🔊</span>
                 </button>
