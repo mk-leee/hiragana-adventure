@@ -1792,7 +1792,6 @@ function SJPTPractice({ part, onBack }) {
             fontSize: 20, fontWeight: 900, color: "#222",
             fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 4,
           }}>{card.japanese}</div>
-          <div style={{ fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4 }}>{card.hiragana}</div>
           {card.reading && <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 10 }}>{card.reading}</div>}
           <div style={{
             display: "inline-block", background: part.color + "18",
@@ -1837,7 +1836,6 @@ function SJPTPractice({ part, onBack }) {
         }}>
           <div style={{ fontSize: 64, marginBottom: 12 }}>{card.emoji}</div>
           <div style={{ fontSize: 20, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 6 }}>{displayJp}</div>
-          <div style={{ fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4 }}>{displayHiragana}</div>
           {displayReading && <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 12 }}>{displayReading}</div>}
           <div style={{ display: "inline-block", background: part.color + "18", color: part.color, borderRadius: 12, padding: "8px 20px", fontSize: 15, fontWeight: 900, marginBottom: 10 }}>{displayKr}</div>
 
