@@ -1705,6 +1705,7 @@ function SJPTPractice({ part, onBack }) {
   const displayJp = isVar ? sub(card.jp, "jp") : card.japanese;
   const displayKr = isVar ? sub(card.kr, "kr") : card.meaning;
   const displayHiragana = isVar ? sub(card.hiragana, "jp") : card.hiragana;
+  const displayReading = isVar ? sub(card.reading || "", "pron") : (card.reading || "");
 
   // Reset selections on card change
   useEffect(() => { setVarSel({}); }, [cardIdx]);
@@ -1792,7 +1793,7 @@ function SJPTPractice({ part, onBack }) {
             fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 4,
           }}>{card.japanese}</div>
           <div style={{ fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4 }}>{card.hiragana}</div>
-          <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 10 }}>{card.romaji}</div>
+          {card.reading && <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 10 }}>{card.reading}</div>}
           <div style={{
             display: "inline-block", background: part.color + "18",
             color: part.color, borderRadius: 12, padding: "7px 20px",
@@ -1837,7 +1838,7 @@ function SJPTPractice({ part, onBack }) {
           <div style={{ fontSize: 64, marginBottom: 12 }}>{card.emoji}</div>
           <div style={{ fontSize: 20, fontWeight: 900, color: "#222", fontFamily: "'Noto Sans JP', sans-serif", lineHeight: 1.5, marginBottom: 6 }}>{displayJp}</div>
           <div style={{ fontSize: 13, color: "#888", fontFamily: "'Noto Sans JP', sans-serif", marginBottom: 4 }}>{displayHiragana}</div>
-          {!isVar && <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 12 }}>{card.romaji}</div>}
+          {displayReading && <div style={{ fontSize: 12, color: "#BBB", letterSpacing: 0.5, marginBottom: 12 }}>{displayReading}</div>}
           <div style={{ display: "inline-block", background: part.color + "18", color: part.color, borderRadius: 12, padding: "8px 20px", fontSize: 15, fontWeight: 900, marginBottom: 10 }}>{displayKr}</div>
 
           {/* 변수 선택 칩 (variable 타입 카드만) */}
@@ -1862,7 +1863,10 @@ function SJPTPractice({ part, onBack }) {
                       color: sel ? "white" : "#555",
                       cursor: "pointer", transition: "all 0.15s",
                     }}>
-                      {opt.jp}<span style={{ fontSize: 10, opacity: 0.75, marginLeft: 4 }}>({opt.kr})</span>
+                      {opt.jp}
+                      <span style={{ fontSize: 10, opacity: 0.75, marginLeft: 4 }}>
+                        {opt.pron && `${opt.pron} · `}{opt.kr}
+                      </span>
                     </button>
                   );
                 })}
