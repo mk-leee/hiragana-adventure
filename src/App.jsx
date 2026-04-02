@@ -1704,7 +1704,6 @@ function SJPTPractice({ part, onBack }) {
 
   const displayJp = isVar ? sub(card.jp, "jp") : card.japanese;
   const displayKr = isVar ? sub(card.kr, "kr") : card.meaning;
-  const displayHiragana = isVar ? sub(card.hiragana, "jp") : card.hiragana;
   const displayReading = isVar ? sub(card.reading || "", "pron") : (card.reading || "");
 
   // Reset selections on card change
